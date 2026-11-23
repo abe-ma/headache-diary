@@ -1,6 +1,5 @@
 package io.github.abe_ma.headachediary.ui.settings
 
-import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings as AndroidSettings
@@ -145,7 +144,7 @@ fun SettingsScreen(
             apply(kind)
         } else {
             pending = kind
-            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            launcher.launch(notificationPermissionName())
         }
     }
 

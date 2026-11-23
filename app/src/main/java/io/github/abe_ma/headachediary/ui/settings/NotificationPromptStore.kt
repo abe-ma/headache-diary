@@ -1,6 +1,7 @@
 package io.github.abe_ma.headachediary.ui.settings
 
 import android.content.Context
+import androidx.core.content.edit
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -24,7 +25,7 @@ class SharedPrefsNotificationPromptStore @Inject constructor(
 ) : NotificationPromptStore {
     private val prefs = context.getSharedPreferences("ui_state", Context.MODE_PRIVATE)
     override fun hasBeenShown() = prefs.getBoolean(KEY, false)
-    override fun markShown() = prefs.edit().putBoolean(KEY, true).apply()
+    override fun markShown() = prefs.edit { putBoolean(KEY, true) }
 
     private companion object {
         const val KEY = "effect_notify_prompt_shown"

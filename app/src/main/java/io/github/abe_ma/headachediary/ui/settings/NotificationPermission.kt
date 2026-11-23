@@ -1,6 +1,7 @@
 package io.github.abe_ma.headachediary.ui.settings
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -17,3 +18,11 @@ fun notificationsGranted(context: Context): Boolean {
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     return permissionOk && NotificationManagerCompat.from(context).areNotificationsEnabled()
 }
+
+/**
+ * 通知権限の名前 (POST_NOTIFICATIONS)。
+ * API 33 で追加された定数だが、実体は文字列定数としてコンパイル時にインライン化されるため、API 33 未満でも参照して安全。
+ * API 33 未満で要求すると実行時権限がないので即座に「拒否」が返り、設定画面の案内 (端末の通知設定を開く) に誘導される。
+ */
+@SuppressLint("InlinedApi")
+fun notificationPermissionName(): String = Manifest.permission.POST_NOTIFICATIONS

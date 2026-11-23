@@ -1,6 +1,5 @@
 package io.github.abe_ma.headachediary.ui.edit
 
-import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,6 +68,7 @@ import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.ui.formatDate
 import io.github.abe_ma.headachediary.ui.formatTime
 import io.github.abe_ma.headachediary.ui.labelRes
+import io.github.abe_ma.headachediary.ui.settings.notificationPermissionName
 import io.github.abe_ma.headachediary.ui.settings.notificationsGranted
 import java.time.Instant
 import java.time.LocalDate
@@ -115,7 +115,7 @@ fun AttackEditScreen(
         stage = state.postSavePrompt,
         onAccept = {
             if (notificationsGranted(context)) viewModel.onPromptAccepted(true)
-            else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            else permissionLauncher.launch(notificationPermissionName())
         },
         onDecline = viewModel::onPromptDismissed,
     )

@@ -10,8 +10,6 @@
     <string name="action_back">戻る</string>
     <string name="action_cancel">キャンセル</string>
     <string name="action_ok">決定</string>
-    <string name="action_close">閉じる</string>
-    <string name="placeholder_coming_soon">準備中です</string>
 
     <!-- 痛みの強さ・効果の文言は strings_export.xml の export_severity_* / export_effect_* を UI と書き出しで共用 (FR-202, 204) -->
 
@@ -133,7 +131,6 @@
     <string name="stats_monthly_count_unit">%1$d回</string>
     <string name="stats_monthly_chart_description">月別の発作回数の棒グラフ。%1$s</string>
     <string name="stats_monthly_item">%1$s %2$s</string>
-    <string name="stats_monthly_empty">まだ記録がありません</string>
     <string name="stats_section_pressure">気圧の推移と発作</string>
     <string name="stats_period_week">1週間</string>
     <string name="stats_period_month">1か月</string>

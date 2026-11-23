@@ -2,6 +2,7 @@ package io.github.abe_ma.headachediary.ui.edit
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -38,7 +39,7 @@ class AttackEditScreenTest {
         onSave: () -> Unit = {},
         onDelete: () -> Unit = {},
     ) = rule.setContent {
-        var s by mutableStateOf(initial)
+        var s by remember { mutableStateOf(initial) }
         HeadacheDiaryTheme {
             AttackEditContent(
                 state = s,
