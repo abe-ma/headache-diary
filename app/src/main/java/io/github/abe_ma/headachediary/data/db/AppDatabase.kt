@@ -37,15 +37,24 @@ abstract class AppDatabase : RoomDatabase() {
 }
 
 /**
- * プリセット薬の投入。open のたびに `INSERT OR IGNORE` するので、アプリ更新で末尾に追加した
- * プリセットも次回起動で入る。id は定義順 (1 始まり) で固定。ユーザーの isHidden は上書きしない。
+ * プリセット薬の投入・同期。open のたびに、(1) 未登録の id を INSERT OR IGNORE、(2) 登録済みプリセット行
+ * (isPreset=1) の name/ingredient を定義に合わせて UPDATE する。これでアプリ更新による表記変更と
+ * 末尾追加が既存 DB にも反映される。id・isHidden は変えない (記録の medicationId と非表示設定を保つ)。
+ * 自由入力 (isPreset=0、id>=1000) は更新対象外。
+ * ※ SQLite の UPSERT 構文は API 26 の SQLite (3.18) で使えないため 2 文に分けている。
  */
 object PresetSeedCallback : RoomDatabase.Callback() {
     override fun onOpen(db: SupportSQLiteDatabase) {
         PRESET_MEDICATIONS.forEachIndexed { i, p ->
+            val id = i + 1L
             db.execSQL(
                 "INSERT OR IGNORE INTO medication (id, name, ingredient, isPreset, isHidden) VALUES (?, ?, ?, 1, 0)",
-                arrayOf<Any?>(i + 1L, p.name, p.ingredient),
+                arrayOf<Any?>(id, p.name, p.ingredient),
+            )
+            // 名前の一意制約に自由入力が衝突する場合は更新しない (OR IGNORE)。
+            db.execSQL(
+                "UPDATE OR IGNORE medication SET name = ?, ingredient = ? WHERE id = ? AND isPreset = 1",
+                arrayOf<Any?>(p.name, p.ingredient, id),
             )
         }
     }

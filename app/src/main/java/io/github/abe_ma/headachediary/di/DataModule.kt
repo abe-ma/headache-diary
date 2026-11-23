@@ -11,7 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.abe_ma.headachediary.data.catalog.StaticPrefectureRepository
 import io.github.abe_ma.headachediary.data.db.AppDatabase
-import io.github.abe_ma.headachediary.data.fake.FakePressureRepository
+import io.github.abe_ma.headachediary.data.remote.OpenMeteoApi
+import io.github.abe_ma.headachediary.data.repo.RoomPressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
 import io.github.abe_ma.headachediary.data.repo.NoOpReminderScheduler
 import io.github.abe_ma.headachediary.data.repo.RoomAttackRepository
@@ -25,6 +26,7 @@ import io.github.abe_ma.headachediary.domain.SettingsRepository
 import javax.inject.Singleton
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+private val Context.pressureMetaDataStore: DataStore<Preferences> by preferencesDataStore(name = "pressure_meta")
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -45,9 +47,17 @@ object DataModule {
     @Provides @Singleton
     fun reminders(): ReminderScheduler = NoOpReminderScheduler()
 
-    // TODO(T-05): Open-Meteo 実装に差し替える (現在は空の Fake)。
     @Provides @Singleton
-    fun pressure(): PressureRepository = FakePressureRepository()
+    fun openMeteo(): OpenMeteoApi = OpenMeteoApi.create()
+
+    @Provides @Singleton
+    fun pressure(
+        @ApplicationContext c: Context,
+        db: AppDatabase,
+        api: OpenMeteoApi,
+        settings: SettingsRepository,
+        prefectures: PrefectureRepository,
+    ): PressureRepository = RoomPressureRepository(db.pressureDao(), api, settings, prefectures, c.pressureMetaDataStore)
 
     @Provides @Singleton
     fun attacks(
