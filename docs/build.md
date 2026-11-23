@@ -30,3 +30,16 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 - 権限: `INTERNET`, `POST_NOTIFICATIONS`。位置情報権限なし。
 - `allowBackup=true` + `data_extraction_rules.xml` (API31+) / `backup_rules.xml` (〜API30): DB と `datastore/` を含める (NFR-200)。
 - FileProvider: `${applicationId}.fileprovider`、`cache/exports/` のみ。
+
+## R8 (release) 保持ルールの確認 (T-05 配線時)
+結論: **追加の proguard ルールは不要** (`proguard-rules.pro` は空のまま)。ライブラリ同梱の consumer rules で足りることを
+`app/build/outputs/mapping/release/{seeds,mapping,configuration}.txt` で確認した (assembleRelease、2026-11-23)。
+
+| 対象 | 確認結果 |
+| --- | --- |
+| `PressureRefreshWorker` (WorkManager がクラス名から生成) | 名前・`(Context, WorkerParameters)` コンストラクタとも seeds に残り、リネームなし (work-runtime の `-keepnames/-keepclassmembers ... ListenableWorker`) |
+| `OpenMeteoApi` (Retrofit) | `forecast(...)` が seeds に残る (retrofit の `@retrofit2.http.*` 保持ルール)。クラス名のみ縮小リネーム |
+| `ForecastResponse` / `Hourly` (kotlinx.serialization) | `$serializer` と `Companion.serializer()` が seeds に残る (serialization の consumer rules) |
+| Room | `AppDatabase` / `AppDatabase_Impl` が seeds に残る (`-keep class * extends RoomDatabase`)。Entity のリネームは生成コードに焼き込み済みで問題なし |
+
+未実施: release APK を実機/エミュレータで動かした実行時確認 (JSON パース・Worker 起動)。実機で初回確認する際は release でも気圧取得を一度試すこと。
