@@ -281,4 +281,24 @@ class AttackEditViewModelTest {
         assertTrue(vm.uiState.value.finished)
         assertFalse(store.shown)
     }
+
+    @Test
+    fun FR209_下書きの復元で薬の単位が錠に戻らない() {
+        val fakes = FakeRepositories()
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
+        val packet = med.copy(id = 17, name = "五苓散", unit = io.github.abe_ma.headachediary.domain.MedicationUnit.PACKET)
+        AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).addMedication(packet)
+
+        val restored = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).uiState.value
+        assertEquals(io.github.abe_ma.headachediary.domain.MedicationUnit.PACKET, restored.intakes.single().medication.unit)
+    }
+
+    @Test
+    fun FR209_単位を持たない古い下書きは錠として復元する() {
+        val old = """{"startedAtMillis":1700000000000,"severity":"MILD","intakes":[{"key":1,"id":0,"medicationId":1,"medicationName":"ロキソニンS","ingredient":null,"isPreset":true,"isHidden":false,"tablets":2,"effect":"UNRATED"}]}"""
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L, "draft" to old))
+        val restored = AttackEditViewModel(FakeRepositories().attacks, FakeRepositories().settings, store, handle).uiState.value
+        assertEquals(io.github.abe_ma.headachediary.domain.MedicationUnit.TABLET, restored.intakes.single().medication.unit)
+        assertEquals(2, restored.intakes.single().tablets)
+    }
 }

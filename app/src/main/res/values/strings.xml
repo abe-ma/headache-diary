@@ -75,6 +75,7 @@
     <string name="settings_last_fetched">最終取得: %1$s</string>
     <string name="settings_last_fetched_none">気圧はまだ取得していません</string>
     <string name="settings_section_notifications">通知</string>
+    <string name="settings_notification_lock_screen">ロック画面での通知の表示内容は、端末の通知設定によります。</string>
     <string name="settings_effect_reminder">服薬の効果入力のお知らせ</string>
     <string name="settings_effect_reminder_desc">効果が未評価の服薬があるとき、一定時間後にお知らせします。</string>
     <string name="settings_effect_delay_label">お知らせまでの時間</string>
@@ -107,8 +108,10 @@
     <!-- このアプリについて (NFR-100, 103, 104, FR-106) -->
     <string name="about_title">このアプリについて</string>
     <string name="about_section_data">データの扱い</string>
-    <string name="about_data_local">発作の記録・服薬などの健康データは、この端末の中だけに保存されます。外部には送信しません。</string>
-    <string name="about_data_sent">外部に送信するのは、気圧の取得のために Open-Meteo へ送る「登録した地域の代表的な緯度・経度(小数第1位に丸めた値)」と「取得する期間」だけです。端末の位置情報は使いません。通信の性質上、IP アドレスは Open-Meteo に届きます。</string>
+    <string name="about_data_local">発作の記録・服薬などの健康データは、この端末の中に保存されます。アプリが自分でこれらを外部へ送信することはありません。</string>
+    <string name="about_data_backup">端末で Android の自動バックアップが有効な場合、記録は Google アカウントを通じて Google のバックアップにも保存されることがあります。端末のバックアップ設定で無効にできます。</string>
+    <string name="about_data_export">CSV・PDF の書き出しは、あなたが操作したときだけ行われます。共有先もあなたが選びます。書き出したファイルには健康に関する記録が含まれます。</string>
+    <string name="about_data_sent">アプリが自分で外部に送信するのは、気圧の取得のために Open-Meteo へ送る「登録した地域の代表的な緯度・経度(小数第1位に丸めた値)」と「取得する期間」だけです。端末の位置情報は使いません。通信の性質上、IP アドレスは Open-Meteo に届きます。</string>
     <string name="about_section_weather">気圧データの提供元</string>
     <string name="about_weather_attribution">Weather data by Open-Meteo.com</string>
     <string name="about_weather_license">気圧データは CC BY 4.0 で提供されています。</string>
@@ -116,6 +119,37 @@
     <string name="about_notice">このアプリは頭痛と服薬の記録、気圧の表示を目的としています。気圧と頭痛の関係についての診断や助言は行いません。体調に不安があるときは、医師や薬剤師にご相談ください。</string>
     <string name="about_version">バージョン %1$s</string>
     <string name="about_link_open_meteo">https://open-meteo.com/</string>
+
+    <!-- 集計 (FR-300, 301, 103, 105, 106)。解釈・助言の文言は置かない (NFR-104) -->
+    <string name="stats_title">集計</string>
+    <string name="stats_region_guidance">地域を設定すると気圧が表示されます。</string>
+    <string name="stats_open_settings">設定を開く</string>
+    <string name="stats_section_monthly">月別の発作回数</string>
+    <string name="stats_month_span_6">6か月</string>
+    <string name="stats_month_span_12">12か月</string>
+    <string name="stats_month_span_24">24か月</string>
+    <string name="stats_month_label">%1$d月</string>
+    <string name="stats_month_label_with_year">%1$d年%2$d月</string>
+    <string name="stats_monthly_count_unit">%1$d回</string>
+    <string name="stats_monthly_chart_description">月別の発作回数の棒グラフ。%1$s</string>
+    <string name="stats_monthly_item">%1$s %2$s</string>
+    <string name="stats_monthly_empty">まだ記録がありません</string>
+    <string name="stats_section_pressure">気圧の推移と発作</string>
+    <string name="stats_period_week">1週間</string>
+    <string name="stats_period_month">1か月</string>
+    <string name="stats_period_note">過去の期間と、予報3日分を表示します。</string>
+    <string name="stats_legend_actual">気圧(取得済み)</string>
+    <string name="stats_legend_forecast">気圧(予報)</string>
+    <string name="stats_legend_attack">発作</string>
+    <string name="stats_legend_now">現在</string>
+    <string name="stats_axis_unit">縦軸: 気圧 (hPa)</string>
+    <string name="stats_pressure_chart_description">気圧と発作の重ね合わせグラフ。期間内の最低 %1$s hPa、最高 %2$s hPa、発作 %3$d件。</string>
+    <string name="stats_pressure_chart_description_no_data">気圧と発作の重ね合わせグラフ。気圧のデータはありません。発作 %1$d件。</string>
+    <string name="stats_attack_count">この期間の発作: %1$d件</string>
+    <string name="stats_pressure_empty">気圧のデータがまだありません。</string>
+    <string name="stats_last_fetched">気圧の最終取得: %1$s</string>
+    <string name="stats_last_fetched_none">気圧はまだ取得していません</string>
+    <string name="stats_open_meteo_link">Weather data by Open-Meteo.com</string>
 
     <!-- 薬選択 (FR-203, 206) -->
     <string name="picker_title">薬を選ぶ</string>

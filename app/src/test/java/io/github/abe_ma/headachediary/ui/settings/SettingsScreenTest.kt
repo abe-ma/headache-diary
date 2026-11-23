@@ -85,6 +85,13 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun FR506_通知設定にロック画面の表示は端末設定に依存する旨を出す() {
+        show()
+        rule.onNodeWithTag(TAG_LOCK_SCREEN_NOTE).assertIsDisplayed()
+        rule.onNodeWithText("端末の通知設定によります", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun FR503_スイッチ操作がコールバックされる() {
         val toggles = mutableListOf<String>()
         show(actions = SettingsActions(
@@ -128,8 +135,12 @@ class SettingsScreenTest {
 
     @Test
     fun FR503_権限が拒否されたら理由を案内する() {
-        show(denied = true)
+        var opened = 0
+        show(actions = SettingsActions(onOpenNotificationSettings = { opened++ }), denied = true)
         rule.onNodeWithTag(TAG_PERMISSION_DENIED).performScrollTo().assertIsDisplayed()
+        // 拒否の直後にも端末の通知設定への導線を出す
+        rule.onNodeWithTag(TAG_OPEN_NOTIFICATION_SETTINGS).performScrollTo().performClick()
+        assertEquals(1, opened)
     }
 
     @Test
@@ -175,7 +186,9 @@ class SettingsScreenTest {
     fun FR106_このアプリについてにOpenMeteoの帰属と外部送信の説明を出す() {
         rule.setContent { HeadacheDiaryTheme { AboutScreen(onBack = {}, versionName = "1.2.3") } }
         rule.onNodeWithText("Weather data by Open-Meteo.com").assertIsDisplayed()
-        rule.onNodeWithText("外部には送信しません", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("自分でこれらを外部へ送信することはありません", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("自動バックアップ", substring = true).performScrollTo().assertIsDisplayed() // 第4節
+        rule.onNodeWithText("共有先もあなたが選びます", substring = true).performScrollTo().assertIsDisplayed() // 第3節
         rule.onNodeWithText("バージョン 1.2.3").performScrollTo().assertIsDisplayed()
     }
 }

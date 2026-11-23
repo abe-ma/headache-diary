@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,6 +37,7 @@ import io.github.abe_ma.headachediary.ui.records.RecordListScreen
 import io.github.abe_ma.headachediary.ui.settings.AboutScreen
 import io.github.abe_ma.headachediary.ui.settings.MedicationManageScreen
 import io.github.abe_ma.headachediary.ui.settings.SettingsScreen
+import io.github.abe_ma.headachediary.ui.stats.StatsScreen
 
 object Routes {
     const val RECORDS = "records"
@@ -77,13 +79,7 @@ fun AppRoot() {
                     tabs.forEach { tab ->
                         NavigationBarItem(
                             selected = destination?.hierarchy?.any { it.route == tab.route } == true,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navController.navigateToTab(tab.route) },
                             icon = { Icon(tab.icon, contentDescription = null) },
                             label = { Text(stringResource(tab.labelRes)) },
                         )
@@ -99,8 +95,7 @@ fun AppRoot() {
                     onOpenAttack = { navController.navigate(Routes.attack(it)) },
                 )
             }
-            // 集計 (T-06) が置き換える。
-            composable(Routes.STATS) { ComingSoon() }
+                        composable(Routes.STATS) { StatsScreen(onOpenSettings = { navController.navigateToTab(Routes.SETTINGS) }) }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     onOpenMedications = { navController.navigate(Routes.MEDICATIONS) },
@@ -119,6 +114,15 @@ fun AppRoot() {
                 AttackEditScreen(onClose = { navController.popBackStack() })
             }
         }
+    }
+}
+
+/** 下部タブの切り替えと同じ遷移 (状態を保存・復元し、積み重ねない)。 */
+private fun NavHostController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 

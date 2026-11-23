@@ -9,6 +9,7 @@ import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.domain.SettingsRepository
 import io.github.abe_ma.headachediary.ui.settings.NotificationPromptStore
@@ -75,16 +76,18 @@ private data class DraftIntake(
     val ingredient: String?,
     val isPreset: Boolean,
     val isHidden: Boolean,
+    /** FR-209。単位導入前に保存された下書きは錠として復元する (互換のため既定値あり)。 */
+    val unit: MedicationUnit = MedicationUnit.TABLET,
     val tablets: Int,
     val effect: Effect,
 )
 
 private fun IntakeDraft.toSnapshot() = DraftIntake(
-    key, id, medication.id, medication.name, medication.ingredient, medication.isPreset, medication.isHidden, tablets, effect,
+    key, id, medication.id, medication.name, medication.ingredient, medication.isPreset, medication.isHidden, medication.unit, tablets, effect,
 )
 
 private fun DraftIntake.toDraft() = IntakeDraft(
-    key, id, Medication(medicationId, medicationName, ingredient, isPreset, isHidden), tablets, effect,
+    key, id, Medication(medicationId, medicationName, ingredient, isPreset, isHidden, unit), tablets, effect,
 )
 
 const val MIN_TABLETS = 1

@@ -56,6 +56,8 @@ fun AboutScreen(onBack: () -> Unit, versionName: String = BuildConfig.VERSION_NA
             Heading(stringResource(R.string.about_section_data))
             Text(stringResource(R.string.about_data_local), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.about_data_sent), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.about_data_backup), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.about_data_export), style = MaterialTheme.typography.bodyLarge)
 
             Heading(stringResource(R.string.about_section_weather))
             TextButton(

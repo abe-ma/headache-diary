@@ -82,6 +82,7 @@ const val TAG_ABOUT_ROW = "settings_about_row"
 const val TAG_PERMISSION_DENIED = "settings_permission_denied"
 const val TAG_PERMISSION_MISSING = "settings_permission_missing"
 const val TAG_OPEN_NOTIFICATION_SETTINGS = "settings_open_notification_settings"
+const val TAG_LOCK_SCREEN_NOTE = "settings_lock_screen_note"
 const val TAG_LAST_FETCHED = "settings_last_fetched"
 
 /** 通知の種類。許可要求の保留に使う。 */
@@ -207,6 +208,7 @@ fun SettingsContent(
             )
 
             SectionHeader(stringResource(R.string.settings_section_notifications))
+            Hint(stringResource(R.string.settings_notification_lock_screen), modifier = Modifier.testTag(TAG_LOCK_SCREEN_NOTE))
             SwitchRow(
                 title = stringResource(R.string.settings_effect_reminder),
                 description = stringResource(R.string.settings_effect_reminder_desc),
@@ -254,14 +256,17 @@ fun SettingsContent(
                     modifier = Modifier.testTag(TAG_PERMISSION_DENIED),
                 )
             }
-            if (permissionMissing) {
+            if (permissionDenied || permissionMissing) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.settings_notification_permission_missing),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag(TAG_PERMISSION_MISSING),
-                    )
+                    if (permissionMissing && !permissionDenied) {
+                        Text(
+                            stringResource(R.string.settings_notification_permission_missing),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag(TAG_PERMISSION_MISSING),
+                        )
+                    }
+                    // 拒否の直後も、端末の通知設定を開けるようにする (権限ダイアログは再表示されないことがあるため)。
                     OutlinedButton(
                         onClick = actions.onOpenNotificationSettings,
                         modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_OPEN_NOTIFICATION_SETTINGS),
