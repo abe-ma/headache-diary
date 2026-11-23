@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.abe_ma.headachediary.data.catalog.StaticPrefectureRepository
 import io.github.abe_ma.headachediary.data.db.AppDatabase
+import io.github.abe_ma.headachediary.data.export.FileExportRepository
 import io.github.abe_ma.headachediary.data.remote.OpenMeteoApi
 import io.github.abe_ma.headachediary.data.repo.RoomPressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
@@ -18,6 +19,7 @@ import io.github.abe_ma.headachediary.data.repo.NoOpReminderScheduler
 import io.github.abe_ma.headachediary.data.repo.RoomAttackRepository
 import io.github.abe_ma.headachediary.data.repo.RoomMedicationRepository
 import io.github.abe_ma.headachediary.domain.AttackRepository
+import io.github.abe_ma.headachediary.domain.ExportRepository
 import io.github.abe_ma.headachediary.domain.MedicationRepository
 import io.github.abe_ma.headachediary.domain.PrefectureRepository
 import io.github.abe_ma.headachediary.domain.PressureRepository
@@ -66,4 +68,11 @@ object DataModule {
         settings: SettingsRepository,
         reminders: ReminderScheduler,
     ): AttackRepository = RoomAttackRepository(db, pressure, settings, reminders)
+
+    @Provides @Singleton
+    fun export(
+        @ApplicationContext c: Context,
+        attacks: AttackRepository,
+        pressure: PressureRepository,
+    ): ExportRepository = FileExportRepository(c, attacks, pressure)
 }
