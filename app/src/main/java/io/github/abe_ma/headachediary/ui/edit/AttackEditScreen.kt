@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
@@ -57,6 +58,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -81,6 +83,8 @@ const val TAG_NOTIFY_DECLINE = "notify_prompt_decline"
 const val TAG_BACK = "edit_back"
 const val TAG_DISCARD_CONFIRM = "edit_discard_confirm"
 const val TAG_SAVE = "edit_save"
+const val TAG_SAVE_REASON = "edit_save_reason"
+const val TAG_SEVERITY_REQUIRED = "severity_required"
 const val TAG_DELETE = "edit_delete"
 const val TAG_DELETE_CONFIRM = "edit_delete_confirm"
 const val TAG_ADD_MEDICATION = "edit_add_medication"
@@ -179,11 +183,22 @@ fun AttackEditContent(
         bottomBar = {
             // 保存は常に画面下で押せる位置に固定 (少タップ)。
             Surface(tonalElevation = 3.dp) {
-                Button(
-                    onClick = onSave,
-                    enabled = !state.isBusy && !state.isLoading && !state.notFound,
-                    modifier = Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp).heightIn(min = 56.dp).testTag(TAG_SAVE),
-                ) { Text(stringResource(R.string.edit_save), style = MaterialTheme.typography.titleMedium) }
+                Column(Modifier.navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // 保存できない理由を、無効なボタンの近くに文字で示す (色だけに頼らない)。
+                    if (state.severity == null && !state.isLoading && !state.notFound) {
+                        Text(
+                            stringResource(R.string.edit_save_needs_severity),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag(TAG_SAVE_REASON),
+                        )
+                    }
+                    Button(
+                        onClick = onSave,
+                        enabled = state.canSave,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(TAG_SAVE),
+                    ) { Text(stringResource(R.string.edit_save), style = MaterialTheme.typography.titleMedium) }
+                }
             }
         },
     ) { padding ->
@@ -346,11 +361,14 @@ private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant
 }
 
 @Composable
-private fun SeveritySection(selected: Severity, onChange: (Severity) -> Unit) {
+private fun SeveritySection(selected: Severity?, onChange: (Severity) -> Unit) {
+    val unselectedDescription = stringResource(R.string.edit_severity_unselected_description)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.edit_section_severity))
         val all = Severity.entries
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        SingleChoiceSegmentedButtonRow(
+            Modifier.fillMaxWidth().semantics { if (selected == null) stateDescription = unselectedDescription },
+        ) {
             all.forEachIndexed { index, severity ->
                 SegmentedButton(
                     selected = severity == selected,
@@ -358,6 +376,21 @@ private fun SeveritySection(selected: Severity, onChange: (Severity) -> Unit) {
                     shape = SegmentedButtonDefaults.itemShape(index, all.size),
                     modifier = Modifier.heightIn(min = 56.dp).testTag(severityTag(severity)),
                 ) { Text(stringResource(severity.labelRes()), style = MaterialTheme.typography.titleSmall) }
+            }
+        }
+        if (selected == null) {
+            // 未選択であることを文字とアイコンで示す (色だけに頼らない)。TalkBack でも読まれる。
+            Row(
+                Modifier.testTag(TAG_SEVERITY_REQUIRED),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                Text(
+                    stringResource(R.string.edit_severity_required),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -64,11 +65,37 @@ class AttackEditScreenTest {
     private val withIntake = base.copy(intakes = listOf(IntakeDraft(1, 0, med, 1, Effect.UNRATED)))
 
     @Test
-    fun FR202_痛みの強さを3択から選べる() {
+    fun FR202_痛みの強さは未選択で始まり_3択から選べる() {
         host(base)
-        rule.onNodeWithTag(severityTag(Severity.MODERATE)).assertIsSelected()
+        Severity.entries.forEach { rule.onNodeWithTag(severityTag(it)).assertIsNotSelected() }
         rule.onNodeWithTag(severityTag(Severity.SEVERE)).performClick()
         rule.onNodeWithTag(severityTag(Severity.SEVERE)).assertIsSelected()
+        rule.onNodeWithTag(severityTag(Severity.MILD)).assertIsNotSelected()
+    }
+
+    @Test
+    fun FR202_未選択のあいだは保存ボタンが無効で_選んでくださいと理由を表示する() {
+        var saved = 0
+        host(base, onSave = { saved++ })
+        rule.onNodeWithTag(TAG_SAVE).assertIsNotEnabled()
+        rule.onNodeWithTag(TAG_SEVERITY_REQUIRED).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("痛みの強さを選んでください").assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SAVE_REASON).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SAVE).performClick()
+        assertEquals(0, saved)
+        // 選ぶと保存でき、案内は消える
+        rule.onNodeWithTag(severityTag(Severity.MILD)).performClick()
+        rule.onNodeWithTag(TAG_SAVE).assertIsEnabled()
+        rule.onNodeWithTag(TAG_SEVERITY_REQUIRED).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_SAVE_REASON).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR202_既存記録の編集では保存済みの強さが選択済みで案内は出ない() {
+        host(base.copy(isNew = false, severity = Severity.SEVERE))
+        rule.onNodeWithTag(severityTag(Severity.SEVERE)).assertIsSelected()
+        rule.onNodeWithTag(TAG_SEVERITY_REQUIRED).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_SAVE).assertIsEnabled()
     }
 
     @Test
@@ -91,7 +118,7 @@ class AttackEditScreenTest {
     @Test
     fun FR203_服薬を削除できる() {
         host(withIntake)
-        rule.onNodeWithText("ロキソニンS").assertIsDisplayed()
+        rule.onNodeWithText("ロキソニンS").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(removeIntakeTag(1)).performScrollTo().performClick()
         rule.onNodeWithText("服薬の記録はありません").assertIsDisplayed()
     }
@@ -99,7 +126,7 @@ class AttackEditScreenTest {
     @Test
     fun FR201_保存ボタンで保存が呼ばれる() {
         var saved = 0
-        host(base, onSave = { saved++ })
+        host(base.copy(severity = Severity.MODERATE), onSave = { saved++ })
         rule.onNodeWithTag(TAG_SAVE).performClick()
         assertEquals(1, saved)
     }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -35,11 +36,12 @@ class AttackEditViewModelTest {
         AttackEditViewModel(fakes.attacks, fakes.settings, store, SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to id)))
 
     @Test
-    fun FR200_新規は現在時刻_中くらい_服薬なしで始まる() {
+    fun FR202_新規は現在時刻_痛みの強さは未選択_服薬なしで始まる() {
         val s = vm(FakeRepositories()).uiState.value
         assertTrue(s.isNew)
         assertFalse(s.isLoading)
-        assertEquals(Severity.MODERATE, s.severity)
+        assertNull(s.severity)
+        assertFalse(s.canSave)
         assertTrue(s.intakes.isEmpty())
         assertTrue(Duration.between(s.startedAt, Instant.now()).abs() < Duration.ofSeconds(10))
     }
@@ -167,9 +169,7 @@ class AttackEditViewModelTest {
         val vm = vm(FakeRepositories())
         assertFalse(vm.uiState.value.isDirty)
         vm.setSeverity(Severity.SEVERE)
-        assertTrue(vm.uiState.value.isDirty)
-        vm.setSeverity(Severity.MODERATE)
-        assertFalse(vm.uiState.value.isDirty)
+        assertTrue(vm.uiState.value.isDirty) // 未選択から選ぶと変更あり
         vm.addMedication(med)
         assertTrue(vm.uiState.value.isDirty)
     }
@@ -201,7 +201,7 @@ class AttackEditViewModelTest {
         first.setSeverity(Severity.SEVERE)
         first.save()
         val again = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).uiState.value
-        assertEquals(Severity.MODERATE, again.severity)
+        assertNull(again.severity) // 保存後の下書きは残らず、新規は未選択に戻る
         assertFalse(again.isDirty)
     }
 
@@ -216,7 +216,7 @@ class AttackEditViewModelTest {
     }
 
     private fun unratedVm(fakes: FakeRepositories): AttackEditViewModel =
-        vm(fakes).also { it.addMedication(med) } // 効果は未評価で入る
+        vm(fakes).also { it.setSeverity(Severity.MILD); it.addMedication(med) } // 効果は未評価で入る
 
     @Test
     fun FR505_未評価の服薬を初めて保存すると説明ダイアログを出し_閉じるまで完了しない() = runTest {
@@ -275,6 +275,7 @@ class AttackEditViewModelTest {
 
         val rated = FakeRepositories()
         val vm = vm(rated)
+        vm.setSeverity(Severity.MILD)
         vm.addMedication(med)
         vm.setEffect(vm.uiState.value.intakes.single().key, Effect.NONE)
         vm.save()
@@ -300,5 +301,56 @@ class AttackEditViewModelTest {
         val restored = AttackEditViewModel(FakeRepositories().attacks, FakeRepositories().settings, store, handle).uiState.value
         assertEquals(io.github.abe_ma.headachediary.domain.MedicationUnit.TABLET, restored.intakes.single().medication.unit)
         assertEquals(2, restored.intakes.single().tablets)
+    }
+
+    @Test
+    fun FR202_痛みの強さが未選択のあいだは保存できない() = runTest {
+        val fakes = FakeRepositories()
+        val vm = vm(fakes)
+        vm.addMedication(med)
+        vm.save()
+        assertTrue(fakes.attacks.observeAttacks().first().isEmpty())
+        assertFalse(vm.uiState.value.finished)
+        assertFalse(vm.uiState.value.isBusy)
+    }
+
+    @Test
+    fun FR202_選ぶと保存できるようになり選んだ値で保存される() = runTest {
+        val fakes = FakeRepositories()
+        val vm = vm(fakes)
+        assertFalse(vm.uiState.value.canSave)
+        vm.setSeverity(Severity.MILD)
+        assertTrue(vm.uiState.value.canSave)
+        vm.save()
+        assertEquals(Severity.MILD, fakes.attacks.observeAttacks().first().single().severity)
+    }
+
+    @Test
+    fun FR202_既存の記録の編集では保存済みの値が選択済みで保存できる() = runTest {
+        val fakes = FakeRepositories()
+        val id = fakes.attacks.save(Attack(0, Instant.parse("2026-11-01T00:00:00Z"), Severity.SEVERE, null, emptyList()))
+        val vm = vm(fakes, id)
+        assertEquals(Severity.SEVERE, vm.uiState.value.severity)
+        assertTrue(vm.uiState.value.canSave)
+    }
+
+    @Test
+    fun FR202_下書きの復元でも未選択を保つ() {
+        val fakes = FakeRepositories()
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
+        AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).addMedication(med) // 強さは選ばない
+        val restored = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).uiState.value
+        assertNull(restored.severity)
+        assertFalse(restored.canSave)
+        assertEquals(1, restored.intakes.size)
+    }
+
+    @Test
+    fun FR202_強さを導入する前の旧形式の下書きも読める() {
+        // severity のキーが無い下書き (未選択として復元する)
+        val old = """{"startedAtMillis":1700000000000,"intakes":[]}"""
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L, "draft" to old))
+        val restored = AttackEditViewModel(FakeRepositories().attacks, FakeRepositories().settings, store, handle).uiState.value
+        assertNull(restored.severity)
     }
 }

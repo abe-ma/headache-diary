@@ -33,6 +33,9 @@
     <string name="edit_pick_date">日付を選ぶ</string>
     <string name="edit_pick_time">時刻を選ぶ</string>
     <string name="edit_section_severity">痛みの強さ</string>
+    <string name="edit_severity_required">痛みの強さを選んでください</string>
+    <string name="edit_severity_unselected_description">未選択</string>
+    <string name="edit_save_needs_severity">痛みの強さを選ぶと保存できます</string>
     <string name="edit_section_intakes">服薬</string>
     <string name="edit_intakes_empty">服薬の記録はありません</string>
     <string name="edit_add_medication">薬を追加</string>

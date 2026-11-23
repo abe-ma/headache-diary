@@ -37,7 +37,8 @@ data class AttackEditUiState(
     val isLoading: Boolean = true,
     val isNew: Boolean = true,
     val startedAt: Instant = Instant.now(),
-    val severity: Severity = Severity.MODERATE,
+    /** FR-202: 新規作成時は未選択 (null)。選ぶまで保存できない。既存記録の編集では保存済みの値。 */
+    val severity: Severity? = null,
     val intakes: List<IntakeDraft> = emptyList(),
     val isBusy: Boolean = false,
     val saveFailed: Boolean = false,
@@ -49,7 +50,10 @@ data class AttackEditUiState(
     val postSavePrompt: PostSavePrompt = PostSavePrompt.NONE,
     /** 開いた時点から内容が変わっている (未保存で戻る時の確認に使う)。 */
     val isDirty: Boolean = false,
-)
+) {
+    /** 保存できる状態か。痛みの強さを選ぶまで保存できない (FR-202)。 */
+    val canSave: Boolean get() = !isLoading && !notFound && !isBusy && severity != null
+}
 
 enum class PostSavePrompt {
     NONE,
@@ -63,7 +67,8 @@ enum class PostSavePrompt {
 @Serializable
 private data class DraftSnapshot(
     val startedAtMillis: Long,
-    val severity: Severity,
+    /** 未選択は null。単位や強さの導入前に保存された下書きも読めるよう既定値を持つ。 */
+    val severity: Severity? = null,
     val intakes: List<DraftIntake>,
 )
 
@@ -198,13 +203,15 @@ class AttackEditViewModel @Inject constructor(
 
     fun save() {
         val s = _uiState.value
+        // FR-202: 痛みの強さが未選択のあいだは保存しない (Attack.severity は非 null)。
+        val severity = s.severity ?: return
         if (s.isBusy || s.isLoading || s.notFound) return
         _uiState.update { it.copy(isBusy = true, saveFailed = false) }
         viewModelScope.launch {
             val attack = Attack(
                 id = attackId,
                 startedAt = s.startedAt,
-                severity = s.severity,
+                severity = severity,
                 // 日時を変えたら気圧を引き直すため null を渡す (保存時に Repository が解決する)。
                 pressureHpa = original?.takeIf { it.startedAt == s.startedAt }?.pressureHpa,
                 intakes = s.intakes.map { Intake(it.id, it.medication, it.tablets, it.effect) },
