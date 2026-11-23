@@ -39,7 +39,7 @@ internal fun formatHpa(v: Double?): String = v?.let { String.format(Locale.ROOT,
 internal fun intakeText(name: String, count: Int, unit: String, effect: String) = "$name×$count$unit ($effect)"
 
 object CsvExport {
-    const val BOM = "﻿"
+    const val BOM = "\uFEFF"
     private val FORMULA_PREFIX = setOf('=', '+', '-', '@', '\t', '\r')
 
     /** 表計算の数式実行対策: 先頭が = + - @ なら先頭に ' を付ける。 */

@@ -101,7 +101,7 @@ class ExportRepositoryTest {
         val uri = export.exportCsv(all)
         val b = bytes(uri)
         assertEquals(listOf(0xEF, 0xBB, 0xBF), b.take(3).map { it.toInt() and 0xFF })
-        val text = String(b, Charsets.UTF_8).removePrefix("﻿")
+        val text = String(b, Charsets.UTF_8).removePrefix("\uFEFF")
         val lines = text.split("\r\n")
         assertEquals("発作日時,痛みの強さ,服薬,記録時の気圧(hPa)", lines[0])
         assertEquals("2026-11-20 12:05,軽い,,", lines[1]) // 古い順・服薬なし・気圧欠損は空
@@ -138,7 +138,7 @@ class ExportRepositoryTest {
     fun FR_400_csv_empty_range_returns_header_only() = runBlocking {
         save(t0, Severity.MILD, null)
         val text = String(bytes(export.exportCsv(t0.plusSeconds(86400)..t0.plusSeconds(2 * 86400))), Charsets.UTF_8)
-        assertEquals("﻿発作日時,痛みの強さ,服薬,記録時の気圧(hPa)\r\n", text)
+        assertEquals("\uFEFF発作日時,痛みの強さ,服薬,記録時の気圧(hPa)\r\n", text)
     }
 
     @Test
