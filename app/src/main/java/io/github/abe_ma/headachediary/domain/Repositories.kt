@@ -65,3 +65,13 @@ interface ExportRepository {
 interface PrefectureRepository {
     fun all(): List<Prefecture>
 }
+
+/**
+ * 効果入力リマインダー (FR-500) の予約口。実装は T-08 (WorkManager)。T-03 時点では no-op 実装を束ねる。
+ * 通知タグは `effect-<attackId>`。
+ */
+interface ReminderScheduler {
+    /** attackId 用のリマインダーを (再)予約する。既存があれば置き換える。 */
+    fun scheduleEffectReminder(attackId: Long, delayMinutes: Int)
+    fun cancelEffectReminder(attackId: Long)
+}

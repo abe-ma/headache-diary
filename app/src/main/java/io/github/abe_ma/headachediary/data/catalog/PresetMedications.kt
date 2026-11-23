@@ -26,6 +26,14 @@ val PRESET_MEDICATIONS: List<PresetMedication> = listOf(
     PresetMedication("レイボー", "ラスミジタンコハク酸塩"),
     PresetMedication("ナウゼリン", "ドンペリドン"),
     PresetMedication("プリンペラン", "メトクロプラミド"),
+    // T-03b: 漢方 (包単位。錠数欄は「1回分」扱い)。既存 id を変えないため必ず末尾に追加する。
+    PresetMedication("五苓散", "漢方"),
+    PresetMedication("呉茱萸湯", "漢方"),
+    PresetMedication("葛根湯", "漢方"),
+    PresetMedication("川芎茶調散", "漢方"),
+    PresetMedication("桂枝人参湯", "漢方"),
+    PresetMedication("釣藤散", "漢方"),
+    PresetMedication("半夏白朮天麻湯", "漢方"),
 )
 
 /** プリセットを Medication に変換 (id = 定義順 + 1)。 */

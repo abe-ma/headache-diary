@@ -214,4 +214,18 @@ class FakeRepositoriesTest {
         assertTrue(p.refresh() is io.github.abe_ma.headachediary.domain.RefreshResult.Failure)
         assertNotNull(p.observeLastFetchedAt())
     }
+
+    @Test
+    fun FR_203_kampo_presets_appended_after_existing_ids_unchanged() {
+        val meds = io.github.abe_ma.headachediary.data.catalog.presetMedications()
+        assertEquals(22, meds.size)
+        assertEquals(1L, meds.first { it.name == "カロナール" }.id)
+        assertEquals(15L, meds.first { it.name == "プリンペラン" }.id)
+        assertEquals(
+            listOf("五苓散", "呉茱萸湯", "葛根湯", "川芎茶調散", "桂枝人参湯", "釣藤散", "半夏白朮天麻湯"),
+            meds.drop(15).map { it.name },
+        )
+        assertEquals((16L..22L).toList(), meds.drop(15).map { it.id })
+        assertTrue(meds.drop(15).all { it.ingredient == "漢方" })
+    }
 }
