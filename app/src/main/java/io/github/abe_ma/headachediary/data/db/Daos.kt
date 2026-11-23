@@ -28,6 +28,10 @@ interface AttackDao {
     @Query("SELECT * FROM attack WHERE pressureHpa IS NULL AND startedAt >= :since")
     suspend fun getMissingPressureSince(since: Long): List<AttackEntity>
 
+    /** 効果が未評価の服薬を持つ、指定時刻以降の発作 (起動時のリマインダー復元用)。 */
+    @Query("SELECT DISTINCT a.* FROM attack a JOIN intake i ON i.attackId = a.id WHERE i.effect = 'UNRATED' AND a.startedAt >= :since")
+    suspend fun getUnratedSince(since: Long): List<AttackEntity>
+
     @Query("UPDATE attack SET pressureHpa = :hpa WHERE id = :id AND pressureHpa IS NULL")
     suspend fun fillPressure(id: Long, hpa: Double)
 

@@ -15,7 +15,10 @@ import io.github.abe_ma.headachediary.data.export.FileExportRepository
 import io.github.abe_ma.headachediary.data.remote.OpenMeteoApi
 import io.github.abe_ma.headachediary.data.repo.RoomPressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
-import io.github.abe_ma.headachediary.data.repo.NoOpReminderScheduler
+import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler
+import io.github.abe_ma.headachediary.data.notify.WorkManagerReminderScheduler
+import io.github.abe_ma.headachediary.data.repo.NotifyAwareSettingsRepository
+import io.github.abe_ma.headachediary.data.work.PressureRefreshScheduler
 import io.github.abe_ma.headachediary.data.repo.RoomAttackRepository
 import io.github.abe_ma.headachediary.data.repo.RoomMedicationRepository
 import io.github.abe_ma.headachediary.domain.AttackRepository
@@ -37,7 +40,15 @@ object DataModule {
     fun database(@ApplicationContext c: Context): AppDatabase = AppDatabase.create(c)
 
     @Provides @Singleton
-    fun settings(@ApplicationContext c: Context): SettingsRepository = DataStoreSettingsRepository(c.settingsDataStore)
+    fun settings(@ApplicationContext c: Context): SettingsRepository =
+        NotifyAwareSettingsRepository(DataStoreSettingsRepository(c.settingsDataStore)) { old, new ->
+            // 地域を登録/変更したら直ちに 1 回取得 (初回 31 日分)。次の日次まで待たない。
+            if (new.prefectureCode != null && new.prefectureCode != old.prefectureCode) PressureRefreshScheduler.enqueueNow(c)
+            // 気圧低下通知のオン/オフ・時刻の変更を予約に反映。
+            if (old.dropNotifyEnabled != new.dropNotifyEnabled || old.dropNotifyTime != new.dropNotifyTime) {
+                DropNotifyScheduler.reschedule(c, new)
+            }
+        }
 
     @Provides @Singleton
     fun medications(db: AppDatabase): MedicationRepository = RoomMedicationRepository(db)
@@ -45,9 +56,8 @@ object DataModule {
     @Provides @Singleton
     fun prefectures(): PrefectureRepository = StaticPrefectureRepository()
 
-    // T-08 で WorkManager 実装に差し替える。
     @Provides @Singleton
-    fun reminders(): ReminderScheduler = NoOpReminderScheduler()
+    fun reminders(@ApplicationContext c: Context): ReminderScheduler = WorkManagerReminderScheduler(c)
 
     @Provides @Singleton
     fun openMeteo(): OpenMeteoApi = OpenMeteoApi.create()

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- T-08: 通知の文言 (android-data 作成、manager 確認)。事実のみ。症状の予測・服薬の指示・助言はしない (FR-502, NFR-104)。 -->
+<resources>
+    <string name="notify_channel_effect_name">効果の入力</string>
+    <string name="notify_channel_effect_desc">服薬の効果が未入力のときにお知らせします</string>
+    <string name="notify_channel_drop_name">気圧の低下</string>
+    <string name="notify_channel_drop_desc">予報で気圧が下がる日の前日にお知らせします</string>
+
+    <!-- FR-500: 効果入力のリマインド。タップで該当の発作を開く -->
+    <string name="notify_effect_title">服薬の効果が未入力です</string>
+    <string name="notify_effect_text">記録した服薬の効果を入力できます。</string>
+
+    <!-- FR-501/502: 気圧低下。%1$d は下降幅 (hPa、四捨五入の整数) -->
+    <string name="notify_drop_title">気圧の予報</string>
+    <string name="notify_drop_text">明日、気圧が %1$d hPa 下がる予報です</string>
+</resources>
