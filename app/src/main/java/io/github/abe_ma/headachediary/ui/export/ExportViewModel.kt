@@ -8,10 +8,13 @@ import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.ExportRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -48,6 +51,8 @@ data class ExportUiState(
     val rangeEnd: LocalDate,
     /** 期間内の発作件数。 */
     val attackCount: Int = 0,
+    /** 最初の発作の日。期間指定の下限に使う (発作が無ければ null)。 */
+    val earliestDate: LocalDate? = null,
     val status: ExportStatus = ExportStatus.Idle,
     val share: ShareRequest? = null,
 ) {
@@ -68,6 +73,17 @@ class ExportViewModel internal constructor(
 
     private val today: LocalDate get() = LocalDate.now(clock.withZone(zone))
 
+    /**
+     * 今日の日付の変化。画面を開いたまま日付が変わったとき「今月」「過去3か月」などの端を取り直すため、
+     * 購読されている間だけ定期的に確認する (ViewModel の寿命で回し続けない)。
+     */
+    private val todayFlow = flow {
+        while (true) {
+            emit(today)
+            delay(DAY_CHECK_INTERVAL_MILLIS)
+        }
+    }.distinctUntilChanged()
+
     private data class Selection(val preset: ExportPreset, val customStart: LocalDate, val customEnd: LocalDate, val kind: ExportKind)
     private data class Progress(val status: ExportStatus = ExportStatus.Idle, val share: ShareRequest? = null)
 
@@ -77,21 +93,22 @@ class ExportViewModel internal constructor(
     private val progress = MutableStateFlow(Progress())
 
     val uiState: StateFlow<ExportUiState> = combine(
-        selection, progress, attackRepository.observeAttacks(),
-    ) { sel, prog, all ->
-        val (start, end) = resolveRange(sel, all)
+        selection, progress, attackRepository.observeAttacks(), todayFlow,
+    ) { sel, prog, all, t ->
+        val (start, end) = resolveRange(sel, all, t)
         val inRange = all.count { it.startedAt in start.toInstantRange(end) }
         ExportUiState(
             preset = sel.preset, customStart = sel.customStart, customEnd = sel.customEnd, kind = sel.kind,
-            rangeStart = start, rangeEnd = end, attackCount = inRange, status = prog.status, share = prog.share,
+            rangeStart = start, rangeEnd = end, attackCount = inRange,
+            earliestDate = all.minOfOrNull { it.startedAt }?.atZone(zone)?.toLocalDate(),
+            status = prog.status, share = prog.share,
         )
     }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000),
         ExportUiState(customStart = today.withDayOfMonth(1), customEnd = today, rangeStart = today.withDayOfMonth(1), rangeEnd = today),
     )
 
-    private fun resolveRange(sel: Selection, all: List<Attack>): Pair<LocalDate, LocalDate> {
-        val t = today
+    private fun resolveRange(sel: Selection, all: List<Attack>, t: LocalDate): Pair<LocalDate, LocalDate> {
         return when (sel.preset) {
             ExportPreset.THIS_MONTH -> t.withDayOfMonth(1) to t
             ExportPreset.LAST_3_MONTHS -> t.minusMonths(3).plusDays(1) to t
@@ -105,10 +122,17 @@ class ExportViewModel internal constructor(
     private fun LocalDate.toInstantRange(end: LocalDate): ClosedRange<Instant> =
         atStartOfDay(zone).toInstant()..end.plusDays(1).atStartOfDay(zone).toInstant().minusMillis(1)
 
-    fun setPreset(p: ExportPreset) = selection.update { it.copy(preset = p) }
-    fun setKind(k: ExportKind) = selection.update { it.copy(kind = k) }
-    fun setCustomStart(d: LocalDate) = selection.update { it.copy(preset = ExportPreset.CUSTOM, customStart = d) }
-    fun setCustomEnd(d: LocalDate) = selection.update { it.copy(preset = ExportPreset.CUSTOM, customEnd = minOf(d, today)) }
+    // 期間や形式を変えたら前回の結果 (「ファイルを作成しました」「もう一度共有」) は無効にする。
+    // 前の条件のファイルを共有してしまわないため。生成中に変えた場合は、完了時に結果を採用しない (export() 参照)。
+    fun setPreset(p: ExportPreset) = changeSelection { it.copy(preset = p) }
+    fun setKind(k: ExportKind) = changeSelection { it.copy(kind = k) }
+    fun setCustomStart(d: LocalDate) = changeSelection { it.copy(preset = ExportPreset.CUSTOM, customStart = d) }
+    fun setCustomEnd(d: LocalDate) = changeSelection { it.copy(preset = ExportPreset.CUSTOM, customEnd = minOf(d, today)) }
+
+    private fun changeSelection(transform: (Selection) -> Selection) {
+        selection.update(transform)
+        if (progress.value.status != ExportStatus.Generating) clearResult()
+    }
 
     /** FR-400/401/402: 生成して共有を促す。失敗しても記録機能は妨げない。 */
     fun export() {
@@ -116,6 +140,7 @@ class ExportViewModel internal constructor(
         if (!state.canExport) return
         val range = state.rangeStart.toInstantRange(state.rangeEnd)
         val kind = state.kind
+        val selectionAtStart = selection.value
         progress.update { Progress(ExportStatus.Generating) }
         viewModelScope.launch {
             try {
@@ -123,11 +148,15 @@ class ExportViewModel internal constructor(
                     ExportKind.CSV -> exportRepository.exportCsv(range)
                     ExportKind.PDF -> exportRepository.exportPdf(range)
                 }
-                progress.update { Progress(ExportStatus.Done(uri, kind), ShareRequest(uri, kind)) }
+                // 生成中に期間や形式が変えられていたら、このファイルは今の条件のものではないので共有しない。
+                progress.update {
+                    if (selection.value == selectionAtStart) Progress(ExportStatus.Done(uri, kind), ShareRequest(uri, kind))
+                    else Progress()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                progress.update { Progress(ExportStatus.Failed) }
+                progress.update { if (selection.value == selectionAtStart) Progress(ExportStatus.Failed) else Progress() }
             }
         }
     }
@@ -141,6 +170,9 @@ class ExportViewModel internal constructor(
         progress.update { it.copy(share = ShareRequest(done.uri, done.kind)) }
     }
 
-    /** 条件を変えたら前回の結果は無効にする。 */
-    fun clearResult() = progress.update { Progress() }
+    /** 前回の結果 (完了/失敗) を消す。 */
+    private fun clearResult() = progress.update { Progress() }
 }
+
+/** 日付変更を確かめる間隔。 */
+private const val DAY_CHECK_INTERVAL_MILLIS = 60_000L

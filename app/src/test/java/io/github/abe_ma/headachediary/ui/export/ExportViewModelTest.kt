@@ -160,4 +160,101 @@ class ExportViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    private class MutableClock(var current: Instant, private val z: ZoneId) : Clock() {
+        override fun getZone(): ZoneId = z
+        override fun withZone(zone: ZoneId): Clock = MutableClock(current, zone)
+        override fun instant(): Instant = current
+    }
+
+    @Test
+    fun FR402_期間や形式を変えたら前回の結果を無効にする() = runTest {
+        val vm = vm(FakeRepositories(), RecordingExport())
+        vm.uiState.test {
+            vm.export()
+            assertTrue(expectMostRecentItem().status is ExportStatus.Done)
+
+            vm.setPreset(ExportPreset.LAST_3_MONTHS)
+            var s = expectMostRecentItem()
+            assertEquals(ExportStatus.Idle, s.status)
+            assertNull(s.share)
+
+            vm.export()
+            assertTrue(expectMostRecentItem().status is ExportStatus.Done)
+            vm.setKind(ExportKind.CSV)
+            assertEquals(ExportStatus.Idle, expectMostRecentItem().status)
+
+            vm.export()
+            assertTrue(expectMostRecentItem().status is ExportStatus.Done)
+            vm.setCustomStart(LocalDate.of(2026, 10, 1))
+            assertEquals(ExportStatus.Idle, expectMostRecentItem().status)
+
+            vm.export()
+            vm.setCustomEnd(LocalDate.of(2026, 10, 31))
+            s = expectMostRecentItem()
+            assertEquals(ExportStatus.Idle, s.status) // 完了後に期間を変えたので共有できない
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun FR402_失敗の表示も期間を変えたら消える() = runTest {
+        val vm = vm(FakeRepositories(), RecordingExport(fail = true))
+        vm.uiState.test {
+            vm.export()
+            assertEquals(ExportStatus.Failed, expectMostRecentItem().status)
+            vm.setKind(ExportKind.CSV)
+            assertEquals(ExportStatus.Idle, expectMostRecentItem().status)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun FR402_生成中に条件を変えたら完了した結果は共有しない() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val ex = object : ExportRepository {
+            override suspend fun exportCsv(range: ClosedRange<Instant>): Uri { gate.await(); return Uri.parse("content://x/a.csv") }
+            override suspend fun exportPdf(range: ClosedRange<Instant>): Uri { gate.await(); return Uri.parse("content://x/a.pdf") }
+        }
+        val vm = vm(FakeRepositories(), ex)
+        vm.uiState.test {
+            vm.export()
+            assertEquals(ExportStatus.Generating, expectMostRecentItem().status)
+            vm.setPreset(ExportPreset.LAST_YEAR) // 生成中に変更
+            gate.complete(Unit)
+            val s = expectMostRecentItem()
+            assertEquals(ExportStatus.Idle, s.status)
+            assertNull(s.share)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun FR400_画面を開いたまま日付が変わったら今月の範囲を取り直す() = runTest {
+        val mc = MutableClock(Instant.parse("2026-11-30T14:00:00Z"), zone) // 11/30 23:00 JST
+        val vm = ExportViewModel(FakeRepositories().attacks, RecordingExport(), mc, zone)
+        vm.uiState.test {
+            var s = expectMostRecentItem()
+            assertEquals(LocalDate.of(2026, 11, 1) to LocalDate.of(2026, 11, 30), s.rangeStart to s.rangeEnd)
+            mc.current = Instant.parse("2026-11-30T16:00:00Z") // 12/1 01:00 JST
+            main.dispatcher.scheduler.advanceTimeBy(61_000)
+            main.dispatcher.scheduler.runCurrent()
+            s = expectMostRecentItem()
+            assertEquals(LocalDate.of(2026, 12, 1) to LocalDate.of(2026, 12, 1), s.rangeStart to s.rangeEnd)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun FR400_期間指定の下限用に最初の発作の日を返す() = runTest {
+        val f = FakeRepositories()
+        val vm = vm(f, RecordingExport())
+        vm.uiState.test {
+            assertNull(expectMostRecentItem().earliestDate)
+            f.attacks.save(attack("2026-03-05T00:00:00Z"))
+            f.attacks.save(attack("2026-09-01T00:00:00Z"))
+            assertEquals(LocalDate.of(2026, 3, 5), expectMostRecentItem().earliestDate)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

@@ -157,7 +157,7 @@
     <string name="export_preset_custom">期間を指定</string>
     <string name="export_custom_start">開始日</string>
     <string name="export_custom_end">終了日</string>
-    <string name="export_range_invalid">開始日は終了日より前の日付にしてください。</string>
+    <string name="export_range_invalid">開始日は終了日以前の日付にしてください。</string>
     <string name="export_range_summary">対象: %1$s 〜 %2$s</string>
     <string name="export_attack_count">この期間の発作: %1$d件</string>
     <string name="export_attack_count_zero">この期間の発作の記録はありません。このまま書き出すこともできます。</string>

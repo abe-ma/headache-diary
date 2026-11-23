@@ -242,11 +242,13 @@ fun ExportContent(
         }
     }
 
+    // 期間指定は最初の発作の日より前を選べない (それ以前は「全期間」で足りる)。発作が無いときは1年前まで。
+    val minDate = state.earliestDate ?: today.minusYears(1)
     if (pickStart) {
-        ExportDatePicker(state.customStart, today, onPick = { onCustomStart(it); pickStart = false }, onDismiss = { pickStart = false })
+        ExportDatePicker(state.customStart, minDate, today, onPick = { onCustomStart(it); pickStart = false }, onDismiss = { pickStart = false })
     }
     if (pickEnd) {
-        ExportDatePicker(state.customEnd, today, onPick = { onCustomEnd(it); pickEnd = false }, onDismiss = { pickEnd = false })
+        ExportDatePicker(state.customEnd, minDate, today, onPick = { onCustomEnd(it); pickEnd = false }, onDismiss = { pickEnd = false })
     }
 }
 
@@ -273,13 +275,15 @@ private fun Heading(text: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExportDatePicker(initial: LocalDate, today: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+private fun ExportDatePicker(initial: LocalDate, minDate: LocalDate, today: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
     val pickerState = rememberDatePickerState(
         // DatePicker は UTC 0:00 のミリ秒で日付を表す。
         initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(today)
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                val d = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                return !d.isAfter(today) && !d.isBefore(minDate)
+            }
         },
     )
     DatePickerDialog(
