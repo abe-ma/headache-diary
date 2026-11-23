@@ -1,0 +1,21 @@
+# Gradle / ビルド成果物
+.gradle/
+build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# ローカル設定 (SDK パス・署名情報など。コミットしない)
+local.properties
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS / その他
+.DS_Store
+*.log
