@@ -1,6 +1,9 @@
 package io.github.abe_ma.headachediary.ui.edit
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -50,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -65,12 +69,15 @@ import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.ui.formatDate
 import io.github.abe_ma.headachediary.ui.formatTime
 import io.github.abe_ma.headachediary.ui.labelRes
+import io.github.abe_ma.headachediary.ui.settings.notificationsGranted
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
+const val TAG_NOTIFY_ACCEPT = "notify_prompt_accept"
+const val TAG_NOTIFY_DECLINE = "notify_prompt_decline"
 const val TAG_BACK = "edit_back"
 const val TAG_DISCARD_CONFIRM = "edit_discard_confirm"
 const val TAG_SAVE = "edit_save"
@@ -98,6 +105,20 @@ fun AttackEditScreen(
     LaunchedEffect(state.finished, state.notFound) {
         if (state.finished) onClose()
     }
+
+    // FR-505(b): 「受け取る」で権限を要求し、結果を ViewModel に渡す。
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.onPromptAccepted(granted)
+    }
+    NotificationPromptDialog(
+        stage = state.postSavePrompt,
+        onAccept = {
+            if (notificationsGranted(context)) viewModel.onPromptAccepted(true)
+            else permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        },
+        onDecline = viewModel::onPromptDismissed,
+    )
 
     AttackEditContent(
         state = state,
@@ -407,7 +428,7 @@ private fun IntakeCard(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 ) { Text("−", style = MaterialTheme.typography.headlineSmall) }
                 Text(
-                    stringResource(R.string.edit_tablets_value, draft.tablets),
+                    stringResource(R.string.edit_tablets_value, draft.tablets, stringResource(draft.medication.unit.labelRes())),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.widthIn(min = 56.dp).testTag(tabletsValueTag(draft.key)),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -431,5 +452,38 @@ private fun IntakeCard(
                 }
             }
         }
+    }
+}
+
+/** FR-505(b): 未評価の服薬を初めて保存したときの、通知の説明ダイアログ (一度だけ)。 */
+@Composable
+fun NotificationPromptDialog(stage: PostSavePrompt, onAccept: () -> Unit, onDecline: () -> Unit) {
+    when (stage) {
+        PostSavePrompt.NONE -> Unit
+        PostSavePrompt.ASK -> AlertDialog(
+            onDismissRequest = onDecline,
+            title = { Text(stringResource(R.string.notify_prompt_title)) },
+            text = { Text(stringResource(R.string.notify_prompt_body)) },
+            confirmButton = {
+                TextButton(onClick = onAccept, modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_NOTIFY_ACCEPT)) {
+                    Text(stringResource(R.string.notify_prompt_accept))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDecline, modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_NOTIFY_DECLINE)) {
+                    Text(stringResource(R.string.notify_prompt_decline))
+                }
+            },
+        )
+        PostSavePrompt.DENIED -> AlertDialog(
+            onDismissRequest = onDecline,
+            title = { Text(stringResource(R.string.notify_prompt_denied_title)) },
+            text = { Text(stringResource(R.string.notify_prompt_denied_body)) },
+            confirmButton = {
+                TextButton(onClick = onDecline, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            },
+        )
     }
 }

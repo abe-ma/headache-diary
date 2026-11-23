@@ -23,7 +23,7 @@
     <string name="record_list_no_medication">服薬なし</string>
     <string name="record_list_effect_pending">効果 未評価あり</string>
     <string name="record_list_pressure">気圧 %1$s hPa</string>
-    <string name="intake_summary">%1$s %2$d錠</string>
+    <string name="intake_summary">%1$s %2$d%3$s</string>
     <string name="intake_summary_separator">、</string>
     <string name="record_item_description">%1$s、痛みの強さ %2$s、%3$s</string>
     <string name="record_item_description_effect_pending">効果は未評価の服薬があります</string>
@@ -39,10 +39,10 @@
     <string name="edit_intakes_empty">服薬の記録はありません</string>
     <string name="edit_add_medication">薬を追加</string>
     <string name="edit_remove_intake">%1$s を削除</string>
-    <string name="edit_tablets_label">錠数</string>
-    <string name="edit_tablets_value">%1$d錠</string>
-    <string name="edit_tablets_decrease">錠数を減らす</string>
-    <string name="edit_tablets_increase">錠数を増やす</string>
+    <string name="edit_tablets_label">数量</string>
+    <string name="edit_tablets_value">%1$d%2$s</string>
+    <string name="edit_tablets_decrease">数量を減らす</string>
+    <string name="edit_tablets_increase">数量を増やす</string>
     <string name="edit_effect_label">効果</string>
     <string name="edit_save">保存</string>
     <string name="edit_delete">この記録を削除</string>
@@ -54,8 +54,68 @@
     <string name="edit_discard_ok">保存せず戻る</string>
     <string name="edit_discard_cancel">編集を続ける</string>
     <string name="edit_time_future">未来の時刻は選べません</string>
+    <!-- FR-505(b): 未評価の服薬を初めて保存したときの説明 (一度だけ) -->
+    <string name="notify_prompt_title">効果入力のお知らせを受け取りますか?</string>
+    <string name="notify_prompt_body">服薬の効果が未評価のままのとき、設定した時間のあとにお知らせします。設定でいつでも変更できます。</string>
+    <string name="notify_prompt_accept">受け取る</string>
+    <string name="notify_prompt_decline">受け取らない</string>
+    <string name="notify_prompt_denied_title">通知を使えませんでした</string>
+    <string name="notify_prompt_denied_body">通知が許可されなかったため、お知らせはオフのままです。記録の機能には影響しません。使いたいときは、設定の画面から有効にしてください。</string>
     <string name="edit_not_found">この記録は見つかりませんでした。</string>
     <string name="edit_save_failed">保存できませんでした。もう一度お試しください。</string>
+
+    <!-- 設定 (FR-100, 105, 207, 500〜503) -->
+    <string name="settings_title">設定</string>
+    <string name="settings_section_region">地域</string>
+    <string name="settings_region_label">気圧を取得する地域</string>
+    <string name="settings_region_unset">未設定</string>
+    <string name="settings_region_hint">地域を設定すると気圧が表示されます。位置情報は使いません。</string>
+    <string name="settings_region_picker_title">都道府県を選ぶ</string>
+    <string name="settings_region_clear">未設定にする</string>
+    <string name="settings_last_fetched">最終取得: %1$s</string>
+    <string name="settings_last_fetched_none">気圧はまだ取得していません</string>
+    <string name="settings_section_notifications">通知</string>
+    <string name="settings_effect_reminder">服薬の効果入力のお知らせ</string>
+    <string name="settings_effect_reminder_desc">効果が未評価の服薬があるとき、一定時間後にお知らせします。</string>
+    <string name="settings_effect_delay_label">お知らせまでの時間</string>
+    <string name="settings_delay_minutes">%1$d分後</string>
+    <string name="settings_delay_hours">%1$d時間後</string>
+    <string name="settings_drop_notify">気圧の低下のお知らせ</string>
+    <string name="settings_drop_notify_desc">予報で気圧が下がる日の前日にお知らせします。</string>
+    <string name="settings_drop_threshold_label">下がり幅のしきい値</string>
+    <string name="settings_drop_threshold_value">%1$s hPa</string>
+    <string name="settings_drop_threshold_decrease">しきい値を下げる</string>
+    <string name="settings_drop_threshold_increase">しきい値を上げる</string>
+    <string name="settings_drop_time_label">お知らせの時刻</string>
+    <string name="settings_notification_permission_denied">通知が許可されていないため、オンにできませんでした。記録の機能には影響しません。通知を使うには、端末の設定で許可してください。</string>
+    <string name="settings_notification_permission_missing">通知が許可されていないため、お知らせは表示されません。</string>
+    <string name="settings_open_notification_settings">端末の通知設定を開く</string>
+    <string name="settings_section_data">データ</string>
+    <string name="settings_medications">薬の管理</string>
+    <string name="settings_medications_desc">選択肢に表示する薬を選びます</string>
+    <string name="settings_export">記録の書き出し</string>
+    <string name="settings_export_desc">CSV・PDF で共有します</string>
+    <string name="settings_about">このアプリについて</string>
+    <string name="settings_about_desc">データの扱い・気圧データの提供元</string>
+
+    <!-- 薬の管理 (FR-207) -->
+    <string name="medications_title">薬の管理</string>
+    <string name="medications_desc">オフにした薬は、服薬を追加するときの選択肢に出ません。過去の記録では、そのまま表示されます。</string>
+    <string name="medications_switch_description">%1$s を選択肢に表示する</string>
+    <string name="medications_hidden_badge">非表示</string>
+
+    <!-- このアプリについて (NFR-100, 103, 104, FR-106) -->
+    <string name="about_title">このアプリについて</string>
+    <string name="about_section_data">データの扱い</string>
+    <string name="about_data_local">発作の記録・服薬などの健康データは、この端末の中だけに保存されます。外部には送信しません。</string>
+    <string name="about_data_sent">外部に送信するのは、気圧の取得のために Open-Meteo へ送る「登録した地域の代表的な緯度・経度(小数第1位に丸めた値)」と「取得する期間」だけです。端末の位置情報は使いません。通信の性質上、IP アドレスは Open-Meteo に届きます。</string>
+    <string name="about_section_weather">気圧データの提供元</string>
+    <string name="about_weather_attribution">Weather data by Open-Meteo.com</string>
+    <string name="about_weather_license">気圧データは CC BY 4.0 で提供されています。</string>
+    <string name="about_section_notice">ご利用にあたって</string>
+    <string name="about_notice">このアプリは頭痛と服薬の記録、気圧の表示を目的としています。気圧と頭痛の関係についての診断や助言は行いません。体調に不安があるときは、医師や薬剤師にご相談ください。</string>
+    <string name="about_version">バージョン %1$s</string>
+    <string name="about_link_open_meteo">https://open-meteo.com/</string>
 
     <!-- 薬選択 (FR-203, 206) -->
     <string name="picker_title">薬を選ぶ</string>

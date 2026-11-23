@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.ui.formatListDateTime
 import io.github.abe_ma.headachediary.ui.labelRes
 import java.time.Instant
@@ -118,11 +119,13 @@ private fun AttackRow(attack: Attack, zone: ZoneId, now: Instant, onClick: () ->
     val severityText = stringResource(attack.severity.labelRes())
     val sep = stringResource(R.string.intake_summary_separator)
     val intakeFormat = stringResource(R.string.intake_summary)
+    val tabletUnit = stringResource(MedicationUnit.TABLET.labelRes())
+    val packetUnit = stringResource(MedicationUnit.PACKET.labelRes())
     val noMedication = stringResource(R.string.record_list_no_medication)
     val medsText = if (attack.intakes.isEmpty()) {
         noMedication
     } else {
-        attack.intakes.joinToString(sep) { intakeFormat.format(it.medication.name, it.tablets) }
+        attack.intakes.joinToString(sep) { intakeFormat.format(it.medication.name, it.tablets, if (it.medication.unit == MedicationUnit.PACKET) packetUnit else tabletUnit) }
     }
     val pending = attack.intakes.any { it.effect == Effect.UNRATED }
     val pressureText = attack.pressureHpa?.let {

@@ -20,13 +20,19 @@ import org.junit.Test
 import java.time.Duration
 import java.time.Instant
 
+class InMemoryPromptStore(var shown: Boolean = false) : io.github.abe_ma.headachediary.ui.settings.NotificationPromptStore {
+    override fun hasBeenShown() = shown
+    override fun markShown() { shown = true }
+}
+
 class AttackEditViewModelTest {
     @get:Rule val main = MainDispatcherRule()
 
+    private val store = InMemoryPromptStore()
     private val med = Medication(1, "ロキソニンS", "ロキソプロフェン", isPreset = true, isHidden = false)
 
     private fun vm(fakes: FakeRepositories, id: Long = 0L) =
-        AttackEditViewModel(fakes.attacks, SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to id)))
+        AttackEditViewModel(fakes.attacks, fakes.settings, store, SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to id)))
 
     @Test
     fun FR200_新規は現在時刻_中くらい_服薬なしで始まる() {
@@ -91,6 +97,7 @@ class AttackEditViewModelTest {
         vm.setStartedAt(at)
         vm.setSeverity(Severity.SEVERE)
         vm.addMedication(med)
+        vm.setEffect(vm.uiState.value.intakes.single().key, Effect.EFFECTIVE)
         vm.save()
         val saved = fakes.attacks.observeAttacks().first().single()
         assertEquals(at, saved.startedAt)
@@ -171,14 +178,14 @@ class AttackEditViewModelTest {
     fun FR201_プロセス死後もSavedStateHandleから編集中の内容を復元できる() {
         val fakes = FakeRepositories()
         val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
-        val first = AttackEditViewModel(fakes.attacks, handle)
+        val first = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle)
         val at = Instant.parse("2026-11-20T03:00:00Z")
         first.setStartedAt(at)
         first.setSeverity(Severity.SEVERE)
         first.addMedication(med)
         first.setEffect(first.uiState.value.intakes.single().key, Effect.EFFECTIVE)
 
-        val restored = AttackEditViewModel(fakes.attacks, handle).uiState.value
+        val restored = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).uiState.value
         assertEquals(at, restored.startedAt)
         assertEquals(Severity.SEVERE, restored.severity)
         assertEquals(med, restored.intakes.single().medication)
@@ -190,10 +197,10 @@ class AttackEditViewModelTest {
     fun FR201_保存後は下書きが残らない() = runTest {
         val fakes = FakeRepositories()
         val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
-        val first = AttackEditViewModel(fakes.attacks, handle)
+        val first = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle)
         first.setSeverity(Severity.SEVERE)
         first.save()
-        val again = AttackEditViewModel(fakes.attacks, handle).uiState.value
+        val again = AttackEditViewModel(fakes.attacks, fakes.settings, store, handle).uiState.value
         assertEquals(Severity.MODERATE, again.severity)
         assertFalse(again.isDirty)
     }
@@ -206,5 +213,72 @@ class AttackEditViewModelTest {
         val past = Instant.parse("2026-01-01T00:00:00Z")
         vm.setStartedAt(past)
         assertEquals(past, vm.uiState.value.startedAt)
+    }
+
+    private fun unratedVm(fakes: FakeRepositories): AttackEditViewModel =
+        vm(fakes).also { it.addMedication(med) } // 効果は未評価で入る
+
+    @Test
+    fun FR505_未評価の服薬を初めて保存すると説明ダイアログを出し_閉じるまで完了しない() = runTest {
+        val fakes = FakeRepositories()
+        val vm = unratedVm(fakes)
+        vm.save()
+        assertEquals(PostSavePrompt.ASK, vm.uiState.value.postSavePrompt)
+        assertFalse(vm.uiState.value.finished)
+        assertTrue(store.shown) // 一度だけ
+        assertEquals(1, fakes.attacks.observeAttacks().first().size) // 記録は保存済み
+    }
+
+    @Test
+    fun FR505_受け取るで権限が得られたら効果リマインドをオンにして閉じる() = runTest {
+        val fakes = FakeRepositories()
+        val vm = unratedVm(fakes)
+        vm.save()
+        vm.onPromptAccepted(permissionGranted = true)
+        assertTrue(fakes.settings.observe().first().effectReminderEnabled)
+        assertTrue(vm.uiState.value.finished)
+    }
+
+    @Test
+    fun FR505_権限が拒否されたらオフのまま理由を案内し_閉じると完了する() = runTest {
+        val fakes = FakeRepositories()
+        val vm = unratedVm(fakes)
+        vm.save()
+        vm.onPromptAccepted(permissionGranted = false)
+        assertEquals(PostSavePrompt.DENIED, vm.uiState.value.postSavePrompt)
+        assertFalse(fakes.settings.observe().first().effectReminderEnabled)
+        assertFalse(vm.uiState.value.finished)
+        vm.onPromptDismissed()
+        assertTrue(vm.uiState.value.finished)
+    }
+
+    @Test
+    fun FR505_受け取らないなら設定は変えず閉じ_次回以降は尋ねない() = runTest {
+        val fakes = FakeRepositories()
+        val first = unratedVm(fakes)
+        first.save()
+        first.onPromptDismissed()
+        assertFalse(fakes.settings.observe().first().effectReminderEnabled)
+        assertTrue(first.uiState.value.finished)
+
+        val second = unratedVm(fakes)
+        second.save()
+        assertEquals(PostSavePrompt.NONE, second.uiState.value.postSavePrompt)
+        assertTrue(second.uiState.value.finished)
+    }
+
+    @Test
+    fun FR505_すでにオンの場合と未評価がない場合は尋ねない() = runTest {
+        val enabled = FakeRepositories()
+        enabled.settings.update { it.copy(effectReminderEnabled = true) }
+        unratedVm(enabled).apply { save() }.also { assertTrue(it.uiState.value.finished) }
+
+        val rated = FakeRepositories()
+        val vm = vm(rated)
+        vm.addMedication(med)
+        vm.setEffect(vm.uiState.value.intakes.single().key, Effect.NONE)
+        vm.save()
+        assertTrue(vm.uiState.value.finished)
+        assertFalse(store.shown)
     }
 }

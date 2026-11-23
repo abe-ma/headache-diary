@@ -10,6 +10,8 @@ import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.Severity
+import io.github.abe_ma.headachediary.domain.SettingsRepository
+import io.github.abe_ma.headachediary.ui.settings.NotificationPromptStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,9 +44,19 @@ data class AttackEditUiState(
     val notFound: Boolean = false,
     /** 保存/削除が完了し画面を閉じてよい。 */
     val finished: Boolean = false,
+    /** FR-505(b): 保存後に出す通知の説明ダイアログの段階。出している間は finished にならない。 */
+    val postSavePrompt: PostSavePrompt = PostSavePrompt.NONE,
     /** 開いた時点から内容が変わっている (未保存で戻る時の確認に使う)。 */
     val isDirty: Boolean = false,
 )
+
+enum class PostSavePrompt {
+    NONE,
+    /** 「効果入力のお知らせを受け取りますか?」 */
+    ASK,
+    /** 通知権限が拒否された旨の案内 (FR-505)。 */
+    DENIED,
+}
 
 /** プロセス死から復元するための編集中の下書き (SavedStateHandle に JSON 文字列で保持)。 */
 @Serializable
@@ -81,6 +93,8 @@ const val MAX_TABLETS = 99
 @HiltViewModel
 class AttackEditViewModel @Inject constructor(
     private val attackRepository: AttackRepository,
+    private val settingsRepository: SettingsRepository,
+    private val promptStore: NotificationPromptStore,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     /** ナビゲーション引数 id。0 = 新規。 */
@@ -193,10 +207,37 @@ class AttackEditViewModel @Inject constructor(
                 intakes = s.intakes.map { Intake(it.id, it.medication, it.tablets, it.effect) },
             )
             runCatching { attackRepository.save(attack) }
-                .onSuccess { savedStateHandle.remove<String>(KEY_DRAFT); _uiState.update { it.copy(isBusy = false, finished = true) } }
+                .onSuccess {
+                    savedStateHandle.remove<String>(KEY_DRAFT)
+                    val ask = attack.intakes.any { it.effect == Effect.UNRATED } && shouldAskNotification()
+                    if (ask) promptStore.markShown() // 一度だけ。「受け取らない」でも再表示しない。
+                    _uiState.update {
+                        if (ask) it.copy(isBusy = false, postSavePrompt = PostSavePrompt.ASK)
+                        else it.copy(isBusy = false, finished = true)
+                    }
+                }
                 .onFailure { _uiState.update { it.copy(isBusy = false, saveFailed = true) } }
         }
     }
+
+    /** 未評価の服薬を保存した初回で、効果入力のお知らせがまだオフのときだけ尋ねる。 */
+    private suspend fun shouldAskNotification(): Boolean =
+        !promptStore.hasBeenShown() && !settingsRepository.observe().first().effectReminderEnabled
+
+    /** 「受け取る」: 権限が得られたら設定をオンにして閉じる。拒否ならオフのまま理由を案内する。 */
+    fun onPromptAccepted(permissionGranted: Boolean) {
+        if (!permissionGranted) {
+            _uiState.update { it.copy(postSavePrompt = PostSavePrompt.DENIED) }
+            return
+        }
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(effectReminderEnabled = true) }
+            _uiState.update { it.copy(postSavePrompt = PostSavePrompt.NONE, finished = true) }
+        }
+    }
+
+    /** 「受け取らない」または案内を閉じた: 設定は変えずに閉じる。 */
+    fun onPromptDismissed() = _uiState.update { it.copy(postSavePrompt = PostSavePrompt.NONE, finished = true) }
 
     fun delete() {
         val s = _uiState.value

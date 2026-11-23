@@ -33,11 +33,18 @@ import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.ui.edit.AttackEditScreen
 import io.github.abe_ma.headachediary.ui.edit.AttackEditViewModel
 import io.github.abe_ma.headachediary.ui.records.RecordListScreen
+import io.github.abe_ma.headachediary.ui.settings.AboutScreen
+import io.github.abe_ma.headachediary.ui.settings.MedicationManageScreen
+import io.github.abe_ma.headachediary.ui.settings.SettingsScreen
 
 object Routes {
     const val RECORDS = "records"
     const val STATS = "stats"
     const val SETTINGS = "settings"
+    const val MEDICATIONS = "settings/medications"
+    const val ABOUT = "settings/about"
+    /** 書き出し (T-09b が実画面に置き換える)。 */
+    const val EXPORT = "export"
     const val ATTACK = "attack/{${AttackEditViewModel.ARG_ID}}"
     fun attack(id: Long) = "attack/$id"
 
@@ -92,9 +99,18 @@ fun AppRoot() {
                     onOpenAttack = { navController.navigate(Routes.attack(it)) },
                 )
             }
-            // 集計 (T-06)・設定 (T-07) が置き換える。
+            // 集計 (T-06) が置き換える。
             composable(Routes.STATS) { ComingSoon() }
-            composable(Routes.SETTINGS) { ComingSoon() }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(
+                    onOpenMedications = { navController.navigate(Routes.MEDICATIONS) },
+                    onOpenExport = { navController.navigate(Routes.EXPORT) },
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                )
+            }
+            composable(Routes.MEDICATIONS) { MedicationManageScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.EXPORT) { ComingSoon() }
             composable(
                 Routes.ATTACK,
                 arguments = listOf(navArgument(AttackEditViewModel.ARG_ID) { type = NavType.LongType }),

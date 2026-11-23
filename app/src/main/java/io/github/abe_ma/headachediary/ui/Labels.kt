@@ -3,6 +3,7 @@ package io.github.abe_ma.headachediary.ui
 import androidx.annotation.StringRes
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.Severity
 import java.time.Instant
 import java.time.ZoneId
@@ -22,6 +23,13 @@ fun Effect.labelRes(): Int = when (this) {
     Effect.EFFECTIVE -> R.string.export_effect_effective
     Effect.SLIGHT -> R.string.export_effect_slight
     Effect.NONE -> R.string.export_effect_none
+}
+
+/** FR-209: 数量の単位 (錠/包)。書き出しと同じ文言を共用する。 */
+@StringRes
+fun MedicationUnit.labelRes(): Int = when (this) {
+    MedicationUnit.TABLET -> R.string.export_unit_tablet
+    MedicationUnit.PACKET -> R.string.export_unit_packet
 }
 
 private val dateTimeNoYear = DateTimeFormatter.ofPattern("M月d日(E) H:mm", Locale.JAPAN)
