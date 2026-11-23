@@ -43,3 +43,26 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 | Room | `AppDatabase` / `AppDatabase_Impl` が seeds に残る (`-keep class * extends RoomDatabase`)。Entity のリネームは生成コードに焼き込み済みで問題なし |
 
 未実施: release APK を実機/エミュレータで動かした実行時確認 (JSON パース・Worker 起動)。実機で初回確認する際は release でも気圧取得を一度試すこと。
+
+## リリース前検証 (app/ 3d50aae 時点、2026-11-23、`./gradlew --no-parallel clean ...`)
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (185 件 / 失敗 0) |
+| assembleDebug | 成功。`app/build/outputs/apk/debug/app-debug.apk` (約 16MB) |
+| assembleRelease (R8) | 成功。`app/build/outputs/apk/release/app-release-unsigned.apk` (約 2.4MB、**署名なし**) |
+| bundleRelease | 成功。`app/build/outputs/bundle/release/app-release.aab` (約 5.8MB、署名なし) |
+| lintDebug | **失敗 (1 error / 12 warnings)** |
+
+### lint の内容
+- **Error 1 件 (要対応・android-ui 担当)**: `src/test/.../ui/edit/AttackEditScreenTest.kt:41` `UnrememberedMutableState`。
+  `setContent { var s by mutableStateOf(initial) ... }` を `remember { mutableStateOf(initial) }` にすれば解消。テストコードのみで製品コードへの影響なし。
+  (lint はテストソースも対象のため `lintDebug` が非 0 終了になる。修正されるまで CI 等で lint をゲートにしないこと)
+- Warning 12 件 (対処任意):
+  - InlinedApi 2: `POST_NOTIFICATIONS` (API33+) を参照 (`AttackEditScreen.kt:118`, `SettingsScreen.kt:148`)。要求側で SDK_INT 判定済みなら問題なし (android-ui が確認)。
+  - OldTargetApi 1: targetSdk 36 (最新は 37 系)。Play 要件は 36 以上で満たす。37 へは挙動変更の検証後に上げる。
+  - UnusedResources 4: `action_close`, `placeholder_coming_soon`, `stats_monthly_empty`, `export_pdf_count_suffix`。
+  - MonochromeLauncherIcon 1: アダプティブアイコンに monochrome 未指定 (テーマアイコン非対応)。公開前にデザイン確定したら対応。
+  - UseKtx 4: `toUri` / `SharedPreferences.edit` の KTX 化推奨 (FakeRepositories.kt, NotificationPromptStore.kt, Notifier.kt)。
+
+### 検証していないこと
+実機/エミュレータでの起動・操作、release APK の実行、バックアップ復元。debug APK は実機への手動インストール用 (`adb install -r app/build/outputs/apk/debug/app-debug.apk`)。
