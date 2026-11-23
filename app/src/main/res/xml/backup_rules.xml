@@ -3,4 +3,7 @@
 <full-backup-content>
     <include domain="database" path="." />
     <include domain="file" path="datastore/" />
+    <exclude domain="database" path="androidx.work.workdb" />
+    <exclude domain="database" path="androidx.work.workdb-wal" />
+    <exclude domain="database" path="androidx.work.workdb-shm" />
 </full-backup-content>

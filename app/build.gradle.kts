@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// applicationId / namespace は仮。確定後はここ1か所を変更する (パッケージ名ディレクトリは別途移動が必要)。
+// applicationId / namespace (確定値)。変更する場合はここと src 配下のパッケージディレクトリ・package 宣言を揃える。
 val appId = "io.github.abe_ma.headachediary"
 
 android {
