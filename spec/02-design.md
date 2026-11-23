@@ -32,13 +32,14 @@ data class Medication(
     val ingredient: String?,         // 参考表示 (成分)。自由入力は null
     val isPreset: Boolean,
     val isHidden: Boolean,           // FR-207
+    val unit: MedicationUnit,        // FR-209: TABLET=錠 / PACKET=包 (漢方=包、他=錠)
 )
 data class PressurePoint(val time: Instant, val hpa: Double)    // 1時間値
 data class MonthCount(val yearMonth: YearMonth, val count: Int) // FR-300
 
 data class Settings(
     val prefectureCode: String?,                 // JIS X 0401 の 2桁 "01".."47"。未設定可
-    val effectReminderEnabled: Boolean = true,
+    val effectReminderEnabled: Boolean = false,  // FR-505: 既定オフ
     val effectReminderDelayMinutes: Int = 120,   // FR-500
     val dropNotifyEnabled: Boolean = false,      // FR-501 (権限要求のため既定オフ)
     val dropThresholdHpa: Double = 6.0,
@@ -49,7 +50,7 @@ data class Settings(
 ### Room テーブル
 - `attack(id PK, startedAt, severity, pressureHpa NULL)`
 - `intake(id PK, attackId FK→attack ON DELETE CASCADE, medicationId FK, tablets, effect)`
-- `medication(id PK, name, ingredient NULL, isPreset, isHidden DEFAULT 0)` — プリセットは初回起動時 (または DB 初期化時) に投入。プリセットの定義は `data` 内の静的リソース (01-requirements の一覧)。
+- `medication(id PK, name, ingredient NULL, isPreset, isHidden DEFAULT 0, unit DEFAULT 'TABLET')` (Room v2 / MIGRATION_1_2。プリセットは起動時に id で name/ingredient/unit を同期) — プリセットは初回起動時 (または DB 初期化時) に投入。プリセットの定義は `data` 内の静的リソース (01-requirements の一覧)。
 - `pressure_hour(prefectureCode, time, hpa, PK(prefectureCode, time))` — 地域変更後も過去地域のデータは残す (削除しない)。
 - 使用回数順 (FR-206) は `intake` の集計で算出する (専用カラムを持たない)。
 - 設定は DataStore。DB 移行は `exportSchema=true` で管理。
@@ -135,3 +136,10 @@ interface PrefectureRepository { fun all(): List<Prefecture> }
 | T-08 | 通知 (効果リマインド、気圧低下) | android-data (UI 側は通知タップ遷移) | T-03, T-05 |
 | T-09 | CSV/PDF エクスポート + 書き出し UI | android-data / android-ui | T-03, T-05 |
 | T-10 | プライバシーポリシー・ストア申告資料 (manager が起草) | manager | - |
+
+## 7. 実装との差分メモ (2026-11-23 統合レビュー反映)
+- 画面: 上記に加え「薬の管理」(設定から、FR-207)、「書き出し」(設定から、FR-400〜403)、「このアプリについて」(設定から、帰属・データの扱い・注意書き) が実装された。通知の権限フロー (FR-505) は設定スイッチと、未評価服薬の初回保存後の一度きりの説明ダイアログ (UI 内 SharedPreferences、バックアップ対象外)。
+- 追加の契約: `RefreshResult` (Success / Failure(NO_PREFECTURE|NETWORK|API_ERROR))、`ReminderScheduler` (WorkManager 実装)、通知設定の変更フック (`NotifyAwareSettingsRepository`: 地域変更で即時取得、通知設定変更で再予約)。最終取得時刻は地域別 (FR-504)。
+- 通知: 効果リマインド・気圧低下とも既定オフ。ロック画面は公開版 (FR-506)。
+- 書き出し: CSV 末尾に Open-Meteo 帰属行 (FR-403)、PDF/CSV は薬名×数量+単位 (FR-209)。
+- 例外: UI 専用 Hilt モジュールは `ui/` に置く (PROTOCOL 参照)。
