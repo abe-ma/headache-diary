@@ -91,6 +91,14 @@ class AttackEditScreenTest {
     }
 
     @Test
+    fun FR202_既存記録の読み込み中は未選択の警告を出さない() {
+        host(base.copy(isNew = false, isLoading = true, severity = null))
+        rule.onNodeWithTag(TAG_SEVERITY_REQUIRED).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_SAVE_REASON).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_SAVE).assertIsNotEnabled()
+    }
+
+    @Test
     fun FR202_既存記録の編集では保存済みの強さが選択済みで案内は出ない() {
         host(base.copy(isNew = false, severity = Severity.SEVERE))
         rule.onNodeWithTag(severityTag(Severity.SEVERE)).assertIsSelected()

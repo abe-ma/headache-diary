@@ -213,7 +213,8 @@ fun AttackEditContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             DateTimeSection(state.startedAt, zone, onDateTimeChange)
-            SeveritySection(state.severity, onSeverityChange)
+            // 既存記録の読み込み中は強さがまだ入っていないので、未選択の警告は出さない。
+            SeveritySection(state.severity, showRequired = !state.isLoading && !state.notFound, onChange = onSeverityChange)
             IntakeSection(state.intakes, onAddMedication, onRemoveIntake, onTabletsChange, onEffectChange)
             if (state.saveFailed) {
                 Text(stringResource(R.string.edit_save_failed), color = MaterialTheme.colorScheme.error)
@@ -361,13 +362,13 @@ private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant
 }
 
 @Composable
-private fun SeveritySection(selected: Severity?, onChange: (Severity) -> Unit) {
+private fun SeveritySection(selected: Severity?, showRequired: Boolean, onChange: (Severity) -> Unit) {
     val unselectedDescription = stringResource(R.string.edit_severity_unselected_description)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.edit_section_severity))
         val all = Severity.entries
         SingleChoiceSegmentedButtonRow(
-            Modifier.fillMaxWidth().semantics { if (selected == null) stateDescription = unselectedDescription },
+            Modifier.fillMaxWidth().semantics { if (selected == null && showRequired) stateDescription = unselectedDescription },
         ) {
             all.forEachIndexed { index, severity ->
                 SegmentedButton(
@@ -378,7 +379,7 @@ private fun SeveritySection(selected: Severity?, onChange: (Severity) -> Unit) {
                 ) { Text(stringResource(severity.labelRes()), style = MaterialTheme.typography.titleSmall) }
             }
         }
-        if (selected == null) {
+        if (selected == null && showRequired) {
             // 未選択であることを文字とアイコンで示す (色だけに頼らない)。TalkBack でも読まれる。
             Row(
                 Modifier.testTag(TAG_SEVERITY_REQUIRED),
