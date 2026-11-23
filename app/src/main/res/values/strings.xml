@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">頭痛ダイアリー</string>
+    <string name="tab_record">記録</string>
+    <string name="tab_stats">集計</string>
+    <string name="tab_settings">設定</string>
+</resources>
