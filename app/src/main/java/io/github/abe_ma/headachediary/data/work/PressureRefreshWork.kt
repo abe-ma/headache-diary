@@ -65,6 +65,7 @@ interface PressureWorkEntryPoint {
  */
 class PressureRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        io.github.abe_ma.headachediary.data.export.ExportFiles.deleteOld(applicationContext) // 古い書き出しファイルの掃除
         val ep = EntryPointAccessors.fromApplication(applicationContext, PressureWorkEntryPoint::class.java)
         return when (PressureRefreshJob(ep.pressureRepository(), ep.database()).run()) {
             PressureRefreshJob.Outcome.DONE -> Result.success()

@@ -251,7 +251,7 @@ class PdfReport(
     }
 
     private fun rowBlock(a: Attack): Block {
-        val medLines = a.intakes.flatMap { lines(intakeText(it.medication.name, it.tablets, labels.effect(it.effect)), body, medW) }
+        val medLines = a.intakes.flatMap { lines(intakeText(it.medication.name, it.tablets, labels.unit(it.medication.unit), labels.effect(it.effect)), body, medW) }
         val n = maxOf(1, medLines.size)
         val lh = body.textSize + 3f
         return Block(n * lh + 6f) { c, top ->

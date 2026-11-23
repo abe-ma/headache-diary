@@ -11,6 +11,10 @@
     <string name="export_severity_mild">軽い</string>
     <string name="export_severity_moderate">中くらい</string>
     <string name="export_severity_severe">強い</string>
+    <!-- 薬の単位 (FR-209) -->
+    <string name="export_unit_tablet">錠</string>
+    <string name="export_unit_packet">包</string>
+    <string name="export_csv_attribution"># 気圧データ: Weather data by Open-Meteo.com (https://open-meteo.com/)</string>
     <string name="export_effect_unrated">未評価</string>
     <string name="export_effect_effective">効いた</string>
     <string name="export_effect_slight">少し効いた</string>

@@ -27,12 +27,16 @@ data class Intake(
     val effect: Effect,
 )
 
+/** 服薬の数え方の単位。FR-205, 209。 */
+enum class MedicationUnit { TABLET, PACKET } // 錠 / 包
+
 data class Medication(
     val id: Long,
     val name: String, // 表示名 (商品名)
     val ingredient: String?, // 参考表示 (成分)。自由入力は null
     val isPreset: Boolean,
     val isHidden: Boolean, // FR-207
+    val unit: MedicationUnit = MedicationUnit.TABLET, // FR-209。自由入力は TABLET
 )
 
 /** 気圧の1時間値。 */

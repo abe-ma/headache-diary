@@ -4,12 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.github.abe_ma.headachediary.data.catalog.PRESET_MEDICATIONS
 
 @Database(
     entities = [AttackEntity::class, IntakeEntity::class, MedicationEntity::class, PressureHourEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -21,10 +22,13 @@ abstract class AppDatabase : RoomDatabase() {
         /** DB ファイル名。バックアップ設定 (docs/data-layer.md) と対応するため変更しないこと。 */
         const val NAME = "headache_diary.db"
 
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+
         /** 実機用。 */
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
                 .addCallback(PresetSeedCallback)
+                .addMigrations(*MIGRATIONS)
                 .build()
 
         /** テスト用インメモリ DB (プリセット投入つき)。 */
@@ -33,6 +37,17 @@ abstract class AppDatabase : RoomDatabase() {
                 .addCallback(PresetSeedCallback)
                 .allowMainThreadQueries()
                 .build()
+    }
+}
+
+/**
+ * v1 → v2 (FR-209): medication.unit を追加。既存の記録・薬は全て保持する。
+ * 漢方プリセット (id 16〜22) は包、それ以外は錠 (既定)。
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE medication ADD COLUMN unit TEXT NOT NULL DEFAULT 'TABLET'")
+        db.execSQL("UPDATE medication SET unit = 'PACKET' WHERE isPreset = 1 AND id BETWEEN 16 AND 22")
     }
 }
 
@@ -49,14 +64,14 @@ object PresetSeedCallback : RoomDatabase.Callback() {
         PRESET_MEDICATIONS.forEachIndexed { i, p ->
             val id = i + 1L
             db.execSQL(
-                "INSERT OR IGNORE INTO medication (id, name, ingredient, isPreset, isHidden) VALUES (?, ?, ?, 1, 0)",
-                arrayOf<Any?>(id, p.name, p.ingredient),
+                "INSERT OR IGNORE INTO medication (id, name, ingredient, isPreset, isHidden, unit) VALUES (?, ?, ?, 1, 0, ?)",
+                arrayOf<Any?>(id, p.name, p.ingredient, p.unit.name),
             )
             // 名前の一意制約に自由入力が衝突する場合は更新しない (OR IGNORE)。
             db.execSQL(
-                "UPDATE OR IGNORE medication SET name = ?, ingredient = ? WHERE id = ? AND isPreset = 1 " +
-                    "AND (name != ? OR IFNULL(ingredient, '') != ?)", // 変更時のみ書く (毎起動の書き込みを避ける)
-                arrayOf<Any?>(p.name, p.ingredient, id, p.name, p.ingredient),
+                "UPDATE OR IGNORE medication SET name = ?, ingredient = ?, unit = ? WHERE id = ? AND isPreset = 1 " +
+                    "AND (name != ? OR IFNULL(ingredient, '') != ? OR unit != ?)", // 変更時のみ書く (毎起動の書き込みを避ける)
+                arrayOf<Any?>(p.name, p.ingredient, p.unit.name, id, p.name, p.ingredient, p.unit.name),
             )
         }
     }

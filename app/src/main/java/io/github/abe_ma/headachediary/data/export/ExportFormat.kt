@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.Severity
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -19,6 +20,7 @@ class ExportLabels(private val ctx: Context) {
             Severity.SEVERE -> R.string.export_severity_severe
         },
     )
+    fun unit(v: MedicationUnit) = ctx.getString(if (v == MedicationUnit.PACKET) R.string.export_unit_packet else R.string.export_unit_tablet)
     fun effect(v: Effect) = ctx.getString(
         when (v) {
             Effect.UNRATED -> R.string.export_effect_unrated
@@ -33,12 +35,12 @@ internal val DATETIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy
 
 internal fun formatHpa(v: Double?): String = v?.let { String.format(Locale.ROOT, "%.1f", it) } ?: ""
 
-/** 「薬名×錠数 (効果)」。薬名はそのまま (数式対策は CSV 側)。 */
-internal fun intakeText(name: String, tablets: Int, effect: String) = "$name×$tablets ($effect)"
+/** 「薬名×2錠 (効果)」(FR-209: 単位つき)。薬名はそのまま (数式対策は CSV 側)。 */
+internal fun intakeText(name: String, count: Int, unit: String, effect: String) = "$name×$count$unit ($effect)"
 
 object CsvExport {
     const val BOM = "﻿"
-    private val FORMULA_PREFIX = setOf('=', '+', '-', '@')
+    private val FORMULA_PREFIX = setOf('=', '+', '-', '@', '\t', '\r')
 
     /** 表計算の数式実行対策: 先頭が = + - @ なら先頭に ' を付ける。 */
     internal fun guardFormula(s: String): String = if (s.isNotEmpty() && s[0] in FORMULA_PREFIX) "'$s" else s
@@ -59,10 +61,14 @@ object CsvExport {
             row(
                 DATETIME_FMT.format(a.startedAt.atZone(zone)),
                 labels.severity(a.severity),
-                a.intakes.joinToString(" / ") { intakeText(guardFormula(it.medication.name), it.tablets, labels.effect(it.effect)) },
+                a.intakes.joinToString(" / ") {
+                    intakeText(guardFormula(it.medication.name), it.tablets, labels.unit(it.medication.unit), labels.effect(it.effect))
+                },
                 formatHpa(a.pressureHpa),
             )
         }
+        // FR-403: 気圧が 1 件でもあれば帰属行 (CC BY 4.0)。全て欠損なら付けない。
+        if (attacksOldestFirst.any { it.pressureHpa != null }) sb.append(labels.s(R.string.export_csv_attribution)).append("\r\n")
         return sb.toString()
     }
 }

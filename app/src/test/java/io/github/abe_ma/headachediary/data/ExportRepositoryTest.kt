@@ -105,8 +105,9 @@ class ExportRepositoryTest {
         val lines = text.split("\r\n")
         assertEquals("発作日時,痛みの強さ,服薬,記録時の気圧(hPa)", lines[0])
         assertEquals("2026-11-20 12:05,軽い,,", lines[1]) // 古い順・服薬なし・気圧欠損は空
-        assertEquals("2026-11-21 12:05,強い,ロキソニン×2 (効いた) / カロナール×1 (未評価),1004.3", lines[2])
-        assertEquals("", lines[3]) // 末尾 CRLF
+        assertEquals("2026-11-21 12:05,強い,ロキソニン×2錠 (効いた) / カロナール×1錠 (未評価),1004.3", lines[2])
+        assertEquals("# 気圧データ: Weather data by Open-Meteo.com (https://open-meteo.com/)", lines[3]) // FR-403
+        assertEquals("", lines[4])
         assertFalse(text.replace("\r\n", "").contains("\n"))
         assertTrue(uri.toString().startsWith("content://${ctx.packageName}.fileprovider/exports/"))
     }
@@ -115,15 +116,22 @@ class ExportRepositoryTest {
     fun FR_400_csv_escapes_commas_quotes_newlines_rfc4180() = runBlocking {
         save(t0, Severity.MILD, null, Triple("A,\"B\"\nC", 1, Effect.NONE))
         val text = String(bytes(export.exportCsv(all)), Charsets.UTF_8)
-        assertTrue(text.contains("\"A,\"\"B\"\"\nC×1 (効かなかった)\""))
+        assertTrue(text.contains("\"A,\"\"B\"\"\nC×1錠 (効かなかった)\""))
     }
 
     @Test
     fun FR_400_csv_neutralizes_spreadsheet_formulas_in_medication_names() = runBlocking {
         listOf("=1+1", "+cmd", "-2", "@SUM(A1)").forEach { save(t0, Severity.MILD, null, Triple(it, 1, Effect.UNRATED)) }
         val text = String(bytes(export.exportCsv(all)), Charsets.UTF_8)
-        listOf("'=1+1×1", "'+cmd×1", "'-2×1", "'@SUM(A1)×1").forEach { assertTrue(it, text.contains(it)) }
+        listOf("'=1+1×1錠", "'+cmd×1錠", "'-2×1錠", "'@SUM(A1)×1錠").forEach { assertTrue(it, text.contains(it)) }
         assertFalse(text.contains(",=1+1"))
+    }
+
+    @Test
+    fun FR_400_guardFormula_also_covers_tab_and_cr() {
+        assertEquals("'\tx", io.github.abe_ma.headachediary.data.export.CsvExport.guardFormula("\tx"))
+        assertEquals("'\rx", io.github.abe_ma.headachediary.data.export.CsvExport.guardFormula("\rx"))
+        assertEquals("abc", io.github.abe_ma.headachediary.data.export.CsvExport.guardFormula("abc"))
     }
 
     @Test
@@ -183,5 +191,34 @@ class ExportRepositoryTest {
         save(t0, Severity.MILD, null, Triple("あ".repeat(300), 1, Effect.UNRATED))
         export.exportPdf(all)
         assertTrue(export.lastPdfPageCount >= 1)
+    }
+
+    @Test
+    fun FR_209_kampo_is_shown_with_packet_unit() = runBlocking {
+        save(t0, Severity.MILD, null, Triple("五苓散", 1, Effect.EFFECTIVE))
+        val text = String(bytes(export.exportCsv(all)), Charsets.UTF_8)
+        assertTrue(text.contains("五苓散×1包 (効いた)"))
+    }
+
+    @Test
+    fun FR_403_csv_has_no_attribution_line_when_all_pressure_missing() = runBlocking {
+        save(t0, Severity.MILD, null)
+        val text = String(bytes(export.exportCsv(all)), Charsets.UTF_8)
+        assertFalse(text.contains("Open-Meteo"))
+    }
+
+    @Test
+    fun FR_402_failed_write_leaves_no_final_or_tmp_file_and_stale_files_are_swept_by_helper() = runBlocking {
+        val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
+        val stale = File(dir, "x.csv.tmp").apply { writeText("x"); setLastModified(now.minusSeconds(30 * 3600).toEpochMilli()) }
+        io.github.abe_ma.headachediary.data.export.ExportFiles.deleteOld(ctx, now)
+        assertFalse(stale.exists())
+        val failing = FileExportRepository(ctx, attacks, pressure, { zone }, { now }, pdfOutput = {
+            object : PdfOutput by CanvasPdfOutput() { override fun writeTo(out: java.io.OutputStream) { throw java.io.IOException("disk full") } }
+        })
+        save(t0)
+        val r = runCatching { failing.exportPdf(all) }
+        assertTrue(r.isFailure)
+        assertEquals(emptyList<String>(), dir.list()!!.toList()) // 最終名も .tmp も残らない
     }
 }

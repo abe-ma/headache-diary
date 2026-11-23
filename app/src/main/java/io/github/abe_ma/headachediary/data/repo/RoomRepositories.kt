@@ -13,6 +13,7 @@ import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.MedicationRepository
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.MonthCount
 import io.github.abe_ma.headachediary.domain.PressureRepository
 import io.github.abe_ma.headachediary.domain.ReminderScheduler
@@ -25,7 +26,10 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 
-internal fun MedicationEntity.toDomain() = Medication(id, name, ingredient, isPreset, isHidden)
+internal fun MedicationEntity.toDomain() = Medication(
+    id, name, ingredient, isPreset, isHidden,
+    unit = runCatching { MedicationUnit.valueOf(unit) }.getOrDefault(MedicationUnit.TABLET),
+)
 
 internal fun AttackWithIntakes.toDomain() = Attack(
     id = attack.id,

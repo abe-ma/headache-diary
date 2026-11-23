@@ -1,6 +1,7 @@
 package io.github.abe_ma.headachediary.data.catalog
 
 import io.github.abe_ma.headachediary.domain.Medication
+import io.github.abe_ma.headachediary.domain.MedicationUnit
 
 /**
  * 薬プリセット (頓服薬のみ。01-requirements.md の一覧、FR-203)。
@@ -8,7 +9,7 @@ import io.github.abe_ma.headachediary.domain.Medication
  * Room 投入時も同じ id を使う (後から追加する場合は末尾にのみ追加すること)。
  * 照合結果は docs/medication-verification.md。
  */
-data class PresetMedication(val name: String, val ingredient: String)
+data class PresetMedication(val name: String, val ingredient: String, val unit: MedicationUnit = MedicationUnit.TABLET)
 
 val PRESET_MEDICATIONS: List<PresetMedication> = listOf(
     PresetMedication("カロナール", "アセトアミノフェン"),
@@ -27,16 +28,16 @@ val PRESET_MEDICATIONS: List<PresetMedication> = listOf(
     PresetMedication("ナウゼリン", "ドンペリドン"),
     PresetMedication("プリンペラン", "メトクロプラミド"),
     // T-03b: 漢方 (包単位。錠数欄は「1回分」扱い)。既存 id を変えないため必ず末尾に追加する。
-    PresetMedication("五苓散", "漢方"),
-    PresetMedication("呉茱萸湯", "漢方"),
-    PresetMedication("葛根湯", "漢方"),
-    PresetMedication("川芎茶調散", "漢方"),
-    PresetMedication("桂枝人参湯", "漢方"),
-    PresetMedication("釣藤散", "漢方"),
-    PresetMedication("半夏白朮天麻湯", "漢方"),
+    PresetMedication("五苓散", "漢方", MedicationUnit.PACKET),
+    PresetMedication("呉茱萸湯", "漢方", MedicationUnit.PACKET),
+    PresetMedication("葛根湯", "漢方", MedicationUnit.PACKET),
+    PresetMedication("川芎茶調散", "漢方", MedicationUnit.PACKET),
+    PresetMedication("桂枝人参湯", "漢方", MedicationUnit.PACKET),
+    PresetMedication("釣藤散", "漢方", MedicationUnit.PACKET),
+    PresetMedication("半夏白朮天麻湯", "漢方", MedicationUnit.PACKET),
 )
 
 /** プリセットを Medication に変換 (id = 定義順 + 1)。 */
 fun presetMedications(): List<Medication> = PRESET_MEDICATIONS.mapIndexed { i, p ->
-    Medication(id = (i + 1).toLong(), name = p.name, ingredient = p.ingredient, isPreset = true, isHidden = false)
+    Medication(id = (i + 1).toLong(), name = p.name, ingredient = p.ingredient, isPreset = true, isHidden = false, unit = p.unit)
 }

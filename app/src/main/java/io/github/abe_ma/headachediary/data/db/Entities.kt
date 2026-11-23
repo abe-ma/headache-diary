@@ -26,6 +26,7 @@ data class MedicationEntity(
     val ingredient: String?,
     val isPreset: Boolean,
     @ColumnInfo(defaultValue = "0") val isHidden: Boolean = false,
+    @ColumnInfo(defaultValue = "'TABLET'") val unit: String = "TABLET", // MedicationUnit.name (v2, FR-209)
 )
 
 @Entity(

@@ -90,6 +90,9 @@ class RoomRepositoriesTest {
         assertEquals((1L..PRESET_MEDICATIONS.size).toList(), all.map { it.id })
         assertEquals(22, all.size)
         assertEquals(16L, all.first { it.name == "五苓散" }.id)
+        // FR-209: 漢方 (id 16-22) は包、それ以外は錠
+        assertTrue(all.filter { it.id in 16..22 }.all { it.unit == io.github.abe_ma.headachediary.domain.MedicationUnit.PACKET })
+        assertTrue(all.filter { it.id !in 16..22 }.all { it.unit == io.github.abe_ma.headachediary.domain.MedicationUnit.TABLET })
         assertTrue(all.all { it.isPreset && !it.isHidden })
     }
 
@@ -304,5 +307,10 @@ class RoomRepositoriesTest {
         PresetSeedCallback.onOpen(w)
         val n = w.query("SELECT COUNT(*) FROM upd_log").use { it.moveToFirst(); it.getInt(0) }
         assertEquals(0, n)
+    }
+
+    @Test
+    fun FR_209_custom_medication_is_tablet() = runBlocking {
+        assertEquals(io.github.abe_ma.headachediary.domain.MedicationUnit.TABLET, meds.addCustom("自由薬").unit)
     }
 }
