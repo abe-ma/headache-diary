@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import javax.inject.Inject
 
@@ -40,6 +42,37 @@ data class AttackEditUiState(
     val notFound: Boolean = false,
     /** 保存/削除が完了し画面を閉じてよい。 */
     val finished: Boolean = false,
+    /** 開いた時点から内容が変わっている (未保存で戻る時の確認に使う)。 */
+    val isDirty: Boolean = false,
+)
+
+/** プロセス死から復元するための編集中の下書き (SavedStateHandle に JSON 文字列で保持)。 */
+@Serializable
+private data class DraftSnapshot(
+    val startedAtMillis: Long,
+    val severity: Severity,
+    val intakes: List<DraftIntake>,
+)
+
+@Serializable
+private data class DraftIntake(
+    val key: Long,
+    val id: Long,
+    val medicationId: Long,
+    val medicationName: String,
+    val ingredient: String?,
+    val isPreset: Boolean,
+    val isHidden: Boolean,
+    val tablets: Int,
+    val effect: Effect,
+)
+
+private fun IntakeDraft.toSnapshot() = DraftIntake(
+    key, id, medication.id, medication.name, medication.ingredient, medication.isPreset, medication.isHidden, tablets, effect,
+)
+
+private fun DraftIntake.toDraft() = IntakeDraft(
+    key, id, Medication(medicationId, medicationName, ingredient, isPreset, isHidden), tablets, effect,
 )
 
 const val MIN_TABLETS = 1
@@ -48,7 +81,7 @@ const val MAX_TABLETS = 99
 @HiltViewModel
 class AttackEditViewModel @Inject constructor(
     private val attackRepository: AttackRepository,
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     /** ナビゲーション引数 id。0 = 新規。 */
     private val attackId: Long = savedStateHandle.get<Long>(ARG_ID) ?: 0L
@@ -59,9 +92,15 @@ class AttackEditViewModel @Inject constructor(
     private var original: Attack? = null
     private var nextKey = 1L
 
+    /** 「変更なし」の基準。isDirty の判定に使う。 */
+    private var baseline: DraftSnapshot = snapshotOf(_uiState.value)
+
     init {
         if (attackId == 0L) {
+            // 新規: 基準は開いた時点の状態。復元があれば下書きを反映する。
+            restoreDraft()?.let { applyDraft(it) }
             _uiState.update { it.copy(isLoading = false) }
+            refreshDirty()
         } else {
             viewModelScope.launch {
                 val loaded = attackRepository.observeAttack(attackId).first()
@@ -80,20 +119,54 @@ class AttackEditViewModel @Inject constructor(
                             },
                         )
                     }
+                    baseline = snapshotOf(_uiState.value)
+                    restoreDraft()?.let { applyDraft(it) }
+                    refreshDirty()
                 }
             }
         }
     }
 
-    fun setStartedAt(at: Instant) = _uiState.update { it.copy(startedAt = at) }
-    fun setSeverity(severity: Severity) = _uiState.update { it.copy(severity = severity) }
+    private fun snapshotOf(s: AttackEditUiState) =
+        DraftSnapshot(s.startedAt.toEpochMilli(), s.severity, s.intakes.map { it.toSnapshot().copy(key = 0) })
 
-    /** FR-203: 薬を服薬に追加。錠数 1、効果は未入力から始める。 */
-    fun addMedication(medication: Medication) = _uiState.update {
+    private fun restoreDraft(): DraftSnapshot? =
+        savedStateHandle.get<String>(KEY_DRAFT)?.let { runCatching { Json.decodeFromString<DraftSnapshot>(it) }.getOrNull() }
+
+    private fun applyDraft(d: DraftSnapshot) {
+        nextKey = maxOf(nextKey, (d.intakes.maxOfOrNull { it.key } ?: 0L) + 1)
+        _uiState.update {
+            it.copy(
+                startedAt = Instant.ofEpochMilli(d.startedAtMillis),
+                severity = d.severity,
+                intakes = d.intakes.map { i -> i.toDraft() },
+            )
+        }
+    }
+
+    /** 状態を変える操作は必ずここを通す: 下書きを保存し、isDirty を更新する。 */
+    private fun mutate(transform: (AttackEditUiState) -> AttackEditUiState) {
+        _uiState.update(transform)
+        refreshDirty()
+        val s = _uiState.value
+        if (!s.isLoading && !s.notFound) {
+            val draft = DraftSnapshot(s.startedAt.toEpochMilli(), s.severity, s.intakes.map { it.toSnapshot() })
+            savedStateHandle[KEY_DRAFT] = Json.encodeToString(DraftSnapshot.serializer(), draft)
+        }
+    }
+
+    private fun refreshDirty() = _uiState.update { it.copy(isDirty = snapshotOf(it) != baseline) }
+
+    /** FR-208: 未来の日時は指定できない (現在時刻に丸める)。 */
+    fun setStartedAt(at: Instant) = mutate { it.copy(startedAt = minOf(at, Instant.now())) }
+    fun setSeverity(severity: Severity) = mutate { it.copy(severity = severity) }
+
+    /** FR-203: 薬を服薬に追加。錠数 1、効果は未評価から始める。 */
+    fun addMedication(medication: Medication) = mutate {
         it.copy(intakes = it.intakes + IntakeDraft(nextKey++, 0L, medication, MIN_TABLETS, Effect.UNRATED))
     }
 
-    fun removeIntake(key: Long) = _uiState.update { s -> s.copy(intakes = s.intakes.filterNot { it.key == key }) }
+    fun removeIntake(key: Long) = mutate { s -> s.copy(intakes = s.intakes.filterNot { it.key == key }) }
 
     /** FR-205: 錠数は MIN_TABLETS..MAX_TABLETS に収める。 */
     fun changeTablets(key: Long, delta: Int) = updateIntake(key) {
@@ -102,7 +175,7 @@ class AttackEditViewModel @Inject constructor(
 
     fun setEffect(key: Long, effect: Effect) = updateIntake(key) { it.copy(effect = effect) }
 
-    private fun updateIntake(key: Long, transform: (IntakeDraft) -> IntakeDraft) = _uiState.update { s ->
+    private fun updateIntake(key: Long, transform: (IntakeDraft) -> IntakeDraft) = mutate { s ->
         s.copy(intakes = s.intakes.map { if (it.key == key) transform(it) else it })
     }
 
@@ -120,7 +193,7 @@ class AttackEditViewModel @Inject constructor(
                 intakes = s.intakes.map { Intake(it.id, it.medication, it.tablets, it.effect) },
             )
             runCatching { attackRepository.save(attack) }
-                .onSuccess { _uiState.update { it.copy(isBusy = false, finished = true) } }
+                .onSuccess { savedStateHandle.remove<String>(KEY_DRAFT); _uiState.update { it.copy(isBusy = false, finished = true) } }
                 .onFailure { _uiState.update { it.copy(isBusy = false, saveFailed = true) } }
         }
     }
@@ -131,12 +204,13 @@ class AttackEditViewModel @Inject constructor(
         _uiState.update { it.copy(isBusy = true, saveFailed = false) }
         viewModelScope.launch {
             runCatching { attackRepository.delete(attackId) }
-                .onSuccess { _uiState.update { it.copy(isBusy = false, finished = true) } }
+                .onSuccess { savedStateHandle.remove<String>(KEY_DRAFT); _uiState.update { it.copy(isBusy = false, finished = true) } }
                 .onFailure { _uiState.update { it.copy(isBusy = false, saveFailed = true) } }
         }
     }
 
     companion object {
         const val ARG_ID = "id"
+        private const val KEY_DRAFT = "draft"
     }
 }

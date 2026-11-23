@@ -1,6 +1,8 @@
 package io.github.abe_ma.headachediary.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -60,6 +62,8 @@ fun AppRoot() {
     val showBottomBar = tabs.any { tab -> destination?.hierarchy?.any { it.route == tab.route } == true }
 
     Scaffold(
+        // 上端・左右の WindowInsets は各画面の Scaffold/TopAppBar が処理する。ここでは下部タブ分だけ確保し二重適用を避ける。
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
@@ -81,7 +85,7 @@ fun AppRoot() {
             }
         },
     ) { padding ->
-        NavHost(navController, startDestination = Routes.RECORDS, modifier = Modifier.padding(padding)) {
+        NavHost(navController, startDestination = Routes.RECORDS, modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
             composable(Routes.RECORDS) {
                 RecordListScreen(
                     onAddAttack = { navController.navigate(Routes.attack(0L)) },

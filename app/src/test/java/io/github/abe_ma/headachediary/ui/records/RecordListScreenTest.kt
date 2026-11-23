@@ -54,7 +54,7 @@ class RecordListScreenTest {
         rule.onNodeWithText("11月20日(", substring = true).assertIsDisplayed()
         rule.onNodeWithText("強い").assertIsDisplayed()
         rule.onNodeWithText("ロキソニンS 2錠").assertIsDisplayed()
-        rule.onNodeWithText("効果 未入力あり").assertIsDisplayed()
+        rule.onNodeWithText("効果 未評価あり").assertIsDisplayed()
         rule.onNodeWithTag(recordItemTag(7)).performClick()
         assertEquals(7L, opened)
     }

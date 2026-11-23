@@ -125,7 +125,15 @@ private fun AttackRow(attack: Attack, zone: ZoneId, now: Instant, onClick: () ->
         attack.intakes.joinToString(sep) { intakeFormat.format(it.medication.name, it.tablets) }
     }
     val pending = attack.intakes.any { it.effect == Effect.UNRATED }
-    val description = stringResource(R.string.record_item_description, whenText, severityText, medsText)
+    val pressureText = attack.pressureHpa?.let {
+        stringResource(R.string.record_list_pressure, String.format(Locale.JAPAN, "%.1f", it))
+    }
+    val pendingText = stringResource(R.string.record_item_description_effect_pending)
+    val description = listOfNotNull(
+        stringResource(R.string.record_item_description, whenText, severityText, medsText),
+        pendingText.takeIf { pending },
+        pressureText,
+    ).joinToString("、")
 
     Surface(
         shape = MaterialTheme.shapes.large,

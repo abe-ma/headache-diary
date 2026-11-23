@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,7 +39,7 @@ class AttackEditViewModelTest {
     }
 
     @Test
-    fun FR203_FR204_薬を追加すると錠数1_未入力で入る() {
+    fun FR203_FR204_薬を追加すると錠数1_未評価で入る() {
         val vm = vm(FakeRepositories())
         vm.addMedication(med)
         val i = vm.uiState.value.intakes.single()
@@ -154,6 +153,58 @@ class AttackEditViewModelTest {
         assertTrue(vm.uiState.value.notFound)
         vm.save()
         assertTrue(fakes.attacks.observeAttacks().first().isEmpty())
-        assertNull(null)
+    }
+
+    @Test
+    fun FR201_変更すると未保存扱いになり_元に戻すと解除される() {
+        val vm = vm(FakeRepositories())
+        assertFalse(vm.uiState.value.isDirty)
+        vm.setSeverity(Severity.SEVERE)
+        assertTrue(vm.uiState.value.isDirty)
+        vm.setSeverity(Severity.MODERATE)
+        assertFalse(vm.uiState.value.isDirty)
+        vm.addMedication(med)
+        assertTrue(vm.uiState.value.isDirty)
+    }
+
+    @Test
+    fun FR201_プロセス死後もSavedStateHandleから編集中の内容を復元できる() {
+        val fakes = FakeRepositories()
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
+        val first = AttackEditViewModel(fakes.attacks, handle)
+        val at = Instant.parse("2026-11-20T03:00:00Z")
+        first.setStartedAt(at)
+        first.setSeverity(Severity.SEVERE)
+        first.addMedication(med)
+        first.setEffect(first.uiState.value.intakes.single().key, Effect.EFFECTIVE)
+
+        val restored = AttackEditViewModel(fakes.attacks, handle).uiState.value
+        assertEquals(at, restored.startedAt)
+        assertEquals(Severity.SEVERE, restored.severity)
+        assertEquals(med, restored.intakes.single().medication)
+        assertEquals(Effect.EFFECTIVE, restored.intakes.single().effect)
+        assertTrue(restored.isDirty)
+    }
+
+    @Test
+    fun FR201_保存後は下書きが残らない() = runTest {
+        val fakes = FakeRepositories()
+        val handle = SavedStateHandle(mapOf(AttackEditViewModel.ARG_ID to 0L))
+        val first = AttackEditViewModel(fakes.attacks, handle)
+        first.setSeverity(Severity.SEVERE)
+        first.save()
+        val again = AttackEditViewModel(fakes.attacks, handle).uiState.value
+        assertEquals(Severity.MODERATE, again.severity)
+        assertFalse(again.isDirty)
+    }
+
+    @Test
+    fun FR208_未来の日時は指定できず現在時刻に丸められる() {
+        val vm = vm(FakeRepositories())
+        vm.setStartedAt(Instant.now().plus(Duration.ofDays(3)))
+        assertTrue(!vm.uiState.value.startedAt.isAfter(Instant.now()))
+        val past = Instant.parse("2026-01-01T00:00:00Z")
+        vm.setStartedAt(past)
+        assertEquals(past, vm.uiState.value.startedAt)
     }
 }

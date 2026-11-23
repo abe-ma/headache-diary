@@ -1,5 +1,6 @@
 package io.github.abe_ma.headachediary.ui.edit
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -43,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,12 +71,15 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
+const val TAG_BACK = "edit_back"
+const val TAG_DISCARD_CONFIRM = "edit_discard_confirm"
 const val TAG_SAVE = "edit_save"
 const val TAG_DELETE = "edit_delete"
 const val TAG_DELETE_CONFIRM = "edit_delete_confirm"
 const val TAG_ADD_MEDICATION = "edit_add_medication"
 const val TAG_PICK_DATE = "edit_pick_date"
 const val TAG_PICK_TIME = "edit_pick_time"
+const val TAG_TIME_OK = "edit_time_ok"
 fun severityTag(s: Severity) = "severity_${s.name}"
 fun effectTag(key: Long, e: Effect) = "effect_${key}_${e.name}"
 fun tabletsPlusTag(key: Long) = "tablets_plus_$key"
@@ -86,7 +93,7 @@ fun AttackEditScreen(
     viewModel: AttackEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showPicker by remember { mutableStateOf(false) }
+    var showPicker by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.finished, state.notFound) {
         if (state.finished) onClose()
@@ -130,7 +137,11 @@ fun AttackEditContent(
     onDelete: () -> Unit,
     zone: ZoneId = ZoneId.systemDefault(),
 ) {
-    var confirmDelete by remember { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
+    // 未保存の変更があるときは、戻る操作 (ボタン/ジェスチャ) の前に確認する。
+    val requestBack = { if (state.isDirty && !state.isBusy) confirmDiscard = true else onBack() }
+    BackHandler(enabled = state.isDirty && !state.isBusy) { confirmDiscard = true }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -138,7 +149,7 @@ fun AttackEditContent(
                     Text(stringResource(if (state.isNew) R.string.edit_title_new else R.string.edit_title_existing))
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.size(56.dp)) {
+                    IconButton(onClick = requestBack, modifier = Modifier.size(56.dp).testTag(TAG_BACK)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
@@ -150,7 +161,7 @@ fun AttackEditContent(
                 Button(
                     onClick = onSave,
                     enabled = !state.isBusy && !state.isLoading && !state.notFound,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 56.dp).testTag(TAG_SAVE),
+                    modifier = Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp).heightIn(min = 56.dp).testTag(TAG_SAVE),
                 ) { Text(stringResource(R.string.edit_save), style = MaterialTheme.typography.titleMedium) }
             }
         },
@@ -182,6 +193,24 @@ fun AttackEditContent(
             }
         }
     }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.edit_discard_title)) },
+            text = { Text(stringResource(R.string.edit_discard_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmDiscard = false; onBack() },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_DISCARD_CONFIRM),
+                ) { Text(stringResource(R.string.edit_discard_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.edit_discard_cancel))
+                }
+            },
+        )
+    }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -204,13 +233,18 @@ fun AttackEditContent(
 
 @Composable
 private fun SectionTitle(text: String) =
-    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.semantics { heading() },
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant) -> Unit) {
-    var showDate by remember { mutableStateOf(false) }
-    var showTime by remember { mutableStateOf(false) }
+    var showDate by rememberSaveable { mutableStateOf(false) }
+    var showTime by rememberSaveable { mutableStateOf(false) }
     val local = startedAt.atZone(zone)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.edit_section_datetime))
@@ -262,14 +296,24 @@ private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant
     }
     if (showTime) {
         val timeState = rememberTimePickerState(initialHour = local.hour, initialMinute = local.minute, is24Hour = true)
+        val candidate = local.toLocalDate().atTime(LocalTime.of(timeState.hour, timeState.minute)).atZone(zone).toInstant()
+        val isFuture = candidate.isAfter(Instant.now()) // FR-208: 未来の時刻は選べない
         AlertDialog(
             onDismissRequest = { showTime = false },
-            text = { TimePicker(timeState) },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    TimePicker(timeState)
+                    if (isFuture) {
+                        Text(stringResource(R.string.edit_time_future), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    onChange(local.toLocalDate().atTime(LocalTime.of(timeState.hour, timeState.minute)).atZone(zone).toInstant())
-                    showTime = false
-                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.action_ok)) }
+                TextButton(
+                    onClick = { onChange(candidate); showTime = false },
+                    enabled = !isFuture,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_TIME_OK),
+                ) { Text(stringResource(R.string.action_ok)) }
             },
             dismissButton = {
                 TextButton(onClick = { showTime = false }, modifier = Modifier.heightIn(min = 48.dp)) {

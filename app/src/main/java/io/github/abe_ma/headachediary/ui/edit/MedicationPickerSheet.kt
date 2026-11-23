@@ -20,6 +20,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -47,6 +48,8 @@ fun MedicationPickerSheet(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    // 閉じるときも選んだときも検索語を消し、次に開いたとき前回の絞り込みが残らないようにする。
+    DisposableEffect(Unit) { onDispose { viewModel.clearQuery() } }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         MedicationPickerContent(
             state = state,

@@ -11,17 +11,17 @@ import java.util.Locale
 
 @StringRes
 fun Severity.labelRes(): Int = when (this) {
-    Severity.MILD -> R.string.severity_mild
-    Severity.MODERATE -> R.string.severity_moderate
-    Severity.SEVERE -> R.string.severity_severe
+    Severity.MILD -> R.string.export_severity_mild
+    Severity.MODERATE -> R.string.export_severity_moderate
+    Severity.SEVERE -> R.string.export_severity_severe
 }
 
 @StringRes
 fun Effect.labelRes(): Int = when (this) {
-    Effect.UNRATED -> R.string.effect_unrated
-    Effect.EFFECTIVE -> R.string.effect_effective
-    Effect.SLIGHT -> R.string.effect_slight
-    Effect.NONE -> R.string.effect_none
+    Effect.UNRATED -> R.string.export_effect_unrated
+    Effect.EFFECTIVE -> R.string.export_effect_effective
+    Effect.SLIGHT -> R.string.export_effect_slight
+    Effect.NONE -> R.string.export_effect_none
 }
 
 private val dateTimeNoYear = DateTimeFormatter.ofPattern("M月d日(E) H:mm", Locale.JAPAN)

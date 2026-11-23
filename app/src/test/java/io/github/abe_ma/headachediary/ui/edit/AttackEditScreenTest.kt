@@ -140,5 +140,39 @@ class AttackEditScreenTest {
         assertEquals(listOf(med), picked)
         assertEquals(listOf("新薬X"), customs)
     }
-}
 
+    @Test
+    fun FR201_未保存の変更があると戻る前に確認が出て_破棄で戻れる() {
+        var backed = 0
+        rule.setContent {
+            HeadacheDiaryTheme {
+                AttackEditContent(
+                    state = base.copy(isDirty = true), onBack = { backed++ }, onDateTimeChange = {}, onSeverityChange = {},
+                    onAddMedication = {}, onRemoveIntake = {}, onTabletsChange = { _, _ -> }, onEffectChange = { _, _ -> },
+                    onSave = {}, onDelete = {},
+                )
+            }
+        }
+        rule.onNodeWithTag(TAG_BACK).performClick()
+        assertEquals(0, backed)
+        rule.onNodeWithText("保存しないで戻りますか?").assertIsDisplayed()
+        rule.onNodeWithTag(TAG_DISCARD_CONFIRM).performClick()
+        assertEquals(1, backed)
+    }
+
+    @Test
+    fun FR201_変更がなければ確認なしで戻れる() {
+        var backed = 0
+        rule.setContent {
+            HeadacheDiaryTheme {
+                AttackEditContent(
+                    state = base, onBack = { backed++ }, onDateTimeChange = {}, onSeverityChange = {},
+                    onAddMedication = {}, onRemoveIntake = {}, onTabletsChange = { _, _ -> }, onEffectChange = { _, _ -> },
+                    onSave = {}, onDelete = {},
+                )
+            }
+        }
+        rule.onNodeWithTag(TAG_BACK).performClick()
+        assertEquals(1, backed)
+    }
+}
