@@ -1,0 +1,391 @@
+package io.github.abe_ma.headachediary.ui.edit
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.Medication
+import io.github.abe_ma.headachediary.domain.Severity
+import io.github.abe_ma.headachediary.ui.formatDate
+import io.github.abe_ma.headachediary.ui.formatTime
+import io.github.abe_ma.headachediary.ui.labelRes
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+
+const val TAG_SAVE = "edit_save"
+const val TAG_DELETE = "edit_delete"
+const val TAG_DELETE_CONFIRM = "edit_delete_confirm"
+const val TAG_ADD_MEDICATION = "edit_add_medication"
+const val TAG_PICK_DATE = "edit_pick_date"
+const val TAG_PICK_TIME = "edit_pick_time"
+fun severityTag(s: Severity) = "severity_${s.name}"
+fun effectTag(key: Long, e: Effect) = "effect_${key}_${e.name}"
+fun tabletsPlusTag(key: Long) = "tablets_plus_$key"
+fun tabletsMinusTag(key: Long) = "tablets_minus_$key"
+fun tabletsValueTag(key: Long) = "tablets_value_$key"
+fun removeIntakeTag(key: Long) = "remove_intake_$key"
+
+@Composable
+fun AttackEditScreen(
+    onClose: () -> Unit,
+    viewModel: AttackEditViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showPicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.finished, state.notFound) {
+        if (state.finished) onClose()
+    }
+
+    AttackEditContent(
+        state = state,
+        onBack = onClose,
+        onDateTimeChange = viewModel::setStartedAt,
+        onSeverityChange = viewModel::setSeverity,
+        onAddMedication = { showPicker = true },
+        onRemoveIntake = viewModel::removeIntake,
+        onTabletsChange = viewModel::changeTablets,
+        onEffectChange = viewModel::setEffect,
+        onSave = viewModel::save,
+        onDelete = viewModel::delete,
+    )
+    if (showPicker) {
+        MedicationPickerSheet(
+            onSelected = { med: Medication ->
+                viewModel.addMedication(med)
+                showPicker = false
+            },
+            onDismiss = { showPicker = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AttackEditContent(
+    state: AttackEditUiState,
+    onBack: () -> Unit,
+    onDateTimeChange: (Instant) -> Unit,
+    onSeverityChange: (Severity) -> Unit,
+    onAddMedication: () -> Unit,
+    onRemoveIntake: (Long) -> Unit,
+    onTabletsChange: (key: Long, delta: Int) -> Unit,
+    onEffectChange: (key: Long, effect: Effect) -> Unit,
+    onSave: () -> Unit,
+    onDelete: () -> Unit,
+    zone: ZoneId = ZoneId.systemDefault(),
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(stringResource(if (state.isNew) R.string.edit_title_new else R.string.edit_title_existing))
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            // 保存は常に画面下で押せる位置に固定 (少タップ)。
+            Surface(tonalElevation = 3.dp) {
+                Button(
+                    onClick = onSave,
+                    enabled = !state.isBusy && !state.isLoading && !state.notFound,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 56.dp).testTag(TAG_SAVE),
+                ) { Text(stringResource(R.string.edit_save), style = MaterialTheme.typography.titleMedium) }
+            }
+        },
+    ) { padding ->
+        if (state.notFound) {
+            Column(Modifier.fillMaxSize().padding(padding).padding(32.dp)) {
+                Text(stringResource(R.string.edit_not_found), style = MaterialTheme.typography.bodyLarge)
+            }
+            return@Scaffold
+        }
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            DateTimeSection(state.startedAt, zone, onDateTimeChange)
+            SeveritySection(state.severity, onSeverityChange)
+            IntakeSection(state.intakes, onAddMedication, onRemoveIntake, onTabletsChange, onEffectChange)
+            if (state.saveFailed) {
+                Text(stringResource(R.string.edit_save_failed), color = MaterialTheme.colorScheme.error)
+            }
+            if (!state.isNew) {
+                OutlinedButton(
+                    onClick = { confirmDelete = true },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(TAG_DELETE),
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Text(stringResource(R.string.edit_delete), Modifier.padding(start = 8.dp))
+                }
+            }
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.edit_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.edit_delete_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmDelete = false; onDelete() },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_DELETE_CONFIRM),
+                ) { Text(stringResource(R.string.edit_delete_confirm_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) =
+    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant) -> Unit) {
+    var showDate by remember { mutableStateOf(false) }
+    var showTime by remember { mutableStateOf(false) }
+    val local = startedAt.atZone(zone)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.edit_section_datetime))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val dateText = formatDate(startedAt, zone)
+            val timeText = formatTime(startedAt, zone)
+            val dateDesc = "${stringResource(R.string.edit_pick_date)} $dateText"
+            val timeDesc = "${stringResource(R.string.edit_pick_time)} $timeText"
+            FilledTonalButton(
+                onClick = { showDate = true },
+                modifier = Modifier.weight(2f).heightIn(min = 56.dp).testTag(TAG_PICK_DATE)
+                    .semantics { contentDescription = dateDesc },
+            ) { Text(dateText, style = MaterialTheme.typography.titleMedium) }
+            FilledTonalButton(
+                onClick = { showTime = true },
+                modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag(TAG_PICK_TIME)
+                    .semantics { contentDescription = timeDesc },
+            ) { Text(timeText, style = MaterialTheme.typography.titleMedium) }
+        }
+    }
+    if (showDate) {
+        val today = LocalDate.now(zone)
+        val pickerState = rememberDatePickerState(
+            // DatePicker は UTC 0:00 のミリ秒で日付を表す。
+            initialSelectedDateMillis = local.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                // 未来の日付は選べない。
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(today)
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        onChange(date.atTime(local.toLocalTime()).atZone(zone).toInstant())
+                    }
+                    showDate = false
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDate = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        ) { DatePicker(pickerState) }
+    }
+    if (showTime) {
+        val timeState = rememberTimePickerState(initialHour = local.hour, initialMinute = local.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTime = false },
+            text = { TimePicker(timeState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onChange(local.toLocalDate().atTime(LocalTime.of(timeState.hour, timeState.minute)).atZone(zone).toInstant())
+                    showTime = false
+                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTime = false }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SeveritySection(selected: Severity, onChange: (Severity) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.edit_section_severity))
+        val all = Severity.entries
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            all.forEachIndexed { index, severity ->
+                SegmentedButton(
+                    selected = severity == selected,
+                    onClick = { onChange(severity) },
+                    shape = SegmentedButtonDefaults.itemShape(index, all.size),
+                    modifier = Modifier.heightIn(min = 56.dp).testTag(severityTag(severity)),
+                ) { Text(stringResource(severity.labelRes()), style = MaterialTheme.typography.titleSmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntakeSection(
+    intakes: List<IntakeDraft>,
+    onAdd: () -> Unit,
+    onRemove: (Long) -> Unit,
+    onTabletsChange: (Long, Int) -> Unit,
+    onEffectChange: (Long, Effect) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle(stringResource(R.string.edit_section_intakes))
+        if (intakes.isEmpty()) {
+            Text(
+                stringResource(R.string.edit_intakes_empty),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        intakes.forEach { draft ->
+            IntakeCard(draft, onRemove, onTabletsChange, onEffectChange)
+        }
+        FilledTonalButton(
+            onClick = onAdd,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(TAG_ADD_MEDICATION),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Text(stringResource(R.string.edit_add_medication), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun IntakeCard(
+    draft: IntakeDraft,
+    onRemove: (Long) -> Unit,
+    onTabletsChange: (Long, Int) -> Unit,
+    onEffectChange: (Long, Effect) -> Unit,
+) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(draft.medication.name, style = MaterialTheme.typography.titleMedium)
+                    draft.medication.ingredient?.let {
+                        Text(
+                            stringResource(R.string.picker_ingredient, it),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                IconButton(onClick = { onRemove(draft.key) }, modifier = Modifier.size(56.dp).testTag(removeIntakeTag(draft.key))) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.edit_remove_intake, draft.medication.name))
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.edit_tablets_label), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                val minus = stringResource(R.string.edit_tablets_decrease)
+                val plus = stringResource(R.string.edit_tablets_increase)
+                OutlinedButton(
+                    onClick = { onTabletsChange(draft.key, -1) },
+                    enabled = draft.tablets > MIN_TABLETS,
+                    modifier = Modifier.size(56.dp).testTag(tabletsMinusTag(draft.key)).semantics { contentDescription = minus },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) { Text("−", style = MaterialTheme.typography.headlineSmall) }
+                Text(
+                    stringResource(R.string.edit_tablets_value, draft.tablets),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.widthIn(min = 56.dp).testTag(tabletsValueTag(draft.key)),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                OutlinedButton(
+                    onClick = { onTabletsChange(draft.key, +1) },
+                    enabled = draft.tablets < MAX_TABLETS,
+                    modifier = Modifier.size(56.dp).testTag(tabletsPlusTag(draft.key)).semantics { contentDescription = plus },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) { Text("+", style = MaterialTheme.typography.headlineSmall) }
+            }
+            Text(stringResource(R.string.edit_effect_label), style = MaterialTheme.typography.bodyLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Effect.entries.forEach { effect ->
+                    FilterChip(
+                        selected = draft.effect == effect,
+                        onClick = { onEffectChange(draft.key, effect) },
+                        label = { Text(stringResource(effect.labelRes()), style = MaterialTheme.typography.bodyLarge) },
+                        modifier = Modifier.heightIn(min = 48.dp).testTag(effectTag(draft.key, effect)),
+                    )
+                }
+            }
+        }
+    }
+}

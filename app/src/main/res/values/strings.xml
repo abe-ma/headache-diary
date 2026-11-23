@@ -1,7 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 文言はここに集約。manager が確認する (NFR-104: 医療的助言・診断を含めない)。 -->
 <resources>
     <string name="app_name">頭痛ダイアリー</string>
     <string name="tab_record">記録</string>
     <string name="tab_stats">集計</string>
     <string name="tab_settings">設定</string>
+
+    <!-- 共通 -->
+    <string name="action_back">戻る</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_ok">決定</string>
+    <string name="action_close">閉じる</string>
+    <string name="placeholder_coming_soon">準備中です</string>
+
+    <!-- 痛みの強さ (FR-202) -->
+    <string name="severity_mild">弱い</string>
+    <string name="severity_moderate">中くらい</string>
+    <string name="severity_severe">強い</string>
+
+    <!-- 効果 (FR-204) -->
+    <string name="effect_unrated">未入力</string>
+    <string name="effect_effective">効いた</string>
+    <string name="effect_slight">少し効いた</string>
+    <string name="effect_none">効かなかった</string>
+
+    <!-- 記録一覧 (FR-200) -->
+    <string name="record_list_title">発作の記録</string>
+    <string name="record_list_add">発作を記録する</string>
+    <string name="record_list_empty_title">まだ記録がありません</string>
+    <string name="record_list_empty_body">頭痛が起きたら、右下のボタンから記録できます。</string>
+    <string name="record_list_no_medication">服薬なし</string>
+    <string name="record_list_effect_pending">効果 未入力あり</string>
+    <string name="record_list_pressure">気圧 %1$s hPa</string>
+    <string name="intake_summary">%1$s %2$d錠</string>
+    <string name="intake_summary_separator">、</string>
+    <string name="record_item_description">%1$s、痛みの強さ %2$s、%3$s</string>
+
+    <!-- 発作編集 (FR-201〜205) -->
+    <string name="edit_title_new">発作を記録</string>
+    <string name="edit_title_existing">記録を編集</string>
+    <string name="edit_section_datetime">発作の日時</string>
+    <string name="edit_pick_date">日付を選ぶ</string>
+    <string name="edit_pick_time">時刻を選ぶ</string>
+    <string name="edit_section_severity">痛みの強さ</string>
+    <string name="edit_section_intakes">服薬</string>
+    <string name="edit_intakes_empty">服薬の記録はありません</string>
+    <string name="edit_add_medication">薬を追加</string>
+    <string name="edit_remove_intake">%1$s を削除</string>
+    <string name="edit_tablets_label">錠数</string>
+    <string name="edit_tablets_value">%1$d錠</string>
+    <string name="edit_tablets_decrease">錠数を減らす</string>
+    <string name="edit_tablets_increase">錠数を増やす</string>
+    <string name="edit_effect_label">効果</string>
+    <string name="edit_save">保存</string>
+    <string name="edit_delete">この記録を削除</string>
+    <string name="edit_delete_confirm_title">この記録を削除しますか?</string>
+    <string name="edit_delete_confirm_body">削除すると元に戻せません。</string>
+    <string name="edit_delete_confirm_ok">削除する</string>
+    <string name="edit_not_found">この記録は見つかりませんでした。</string>
+    <string name="edit_save_failed">保存できませんでした。もう一度お試しください。</string>
+
+    <!-- 薬選択 (FR-203, 206) -->
+    <string name="picker_title">薬を選ぶ</string>
+    <string name="picker_search_hint">薬の名前を検索、または入力</string>
+    <string name="picker_add_custom">「%1$s」を新しい薬として追加</string>
+    <string name="picker_empty">候補がありません</string>
+    <string name="picker_ingredient">成分: %1$s</string>
 </resources>

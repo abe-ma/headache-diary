@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.HeadacheDiary" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- 起動時のウィンドウ背景 (ライト)。Compose 側のテーマは ui/theme/Theme.kt。 -->
+    <style name="Theme.HeadacheDiary" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFBFCFF</item>
+    </style>
 </resources>
