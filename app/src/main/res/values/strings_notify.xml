@@ -7,8 +7,13 @@
     <string name="notify_channel_drop_desc">予報で気圧が下がる日の前日にお知らせします</string>
 
     <!-- FR-500: 効果入力のリマインド。タップで該当の発作を開く -->
-    <string name="notify_effect_title">服薬の効果が未入力です</string>
+    <string name="notify_effect_title">服薬の効果が未評価です</string>
     <string name="notify_effect_text">記録した服薬の効果を入力できます。</string>
+
+    <!-- FR-506: ロック画面に出す公開版。薬・服薬・症状の語を出さない -->
+    <string name="notify_public_title">頭痛ダイアリー</string>
+    <string name="notify_public_effect_text">確認したい記録があります</string>
+    <string name="notify_public_drop_text">気圧の予報があります</string>
 
     <!-- FR-501/502: 気圧低下。%1$d は下降幅 (hPa、四捨五入の整数) -->
     <string name="notify_drop_title">気圧の予報</string>

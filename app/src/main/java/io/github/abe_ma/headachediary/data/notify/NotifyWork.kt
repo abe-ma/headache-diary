@@ -89,7 +89,10 @@ object DropNotifyScheduler {
     }
 
     /** 設定に応じて予約 (オフなら取消)。REPLACE なので何度呼んでもよい。 */
-    fun reschedule(context: Context, s: Settings, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()) {
+    fun reschedule(
+        context: Context, s: Settings, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault(),
+        policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
+    ) {
         val wm = WorkManager.getInstance(context)
         if (!s.dropNotifyEnabled) { wm.cancelUniqueWork(NAME); return }
         val at = nextFireAt(now, s.dropNotifyTime, zone)
@@ -97,7 +100,23 @@ object DropNotifyScheduler {
             .setInitialDelay(Duration.between(now, at).toMillis(), TimeUnit.MILLISECONDS)
             .setInputData(Data.Builder().putLong(KEY_INTENDED, at.toEpochMilli()).build())
             .build()
-        wm.enqueueUniqueWork(NAME, ExistingWorkPolicy.REPLACE, req)
+        wm.enqueueUniqueWork(NAME, policy, req)
+    }
+
+    /**
+     * 発火処理のあとに必ず翌日分を予約する (処理が例外で失敗してもチェーンを止めない)。
+     * キャンセルは握らず再送出し、reschedule は走らせない (キャンセル = 設定変更等で別の予約が既にある)。
+     */
+    internal suspend fun runThenReschedule(job: suspend () -> Unit, reschedule: suspend () -> Unit) {
+        try {
+            job()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            reschedule()
+            throw e
+        }
+        reschedule()
     }
 }
 
@@ -106,13 +125,26 @@ class PressureDropWorker(context: Context, params: WorkerParameters) : Coroutine
         val intended = Instant.ofEpochMilli(inputData.getLong(DropNotifyScheduler.KEY_INTENDED, System.currentTimeMillis()))
         val e = ep(applicationContext)
         val settings = e.settingsRepository()
-        DropNotifyJob(
-            settings, e.pressureRepository(), NotifyStateStore(applicationContext.notifyMetaDataStore),
-            AndroidNotifier(applicationContext),
-        ).run(intended)
-        // 翌日分を再予約 (オフ・地域未設定でも設定が変わったら reschedule で復帰する)。
-        DropNotifyScheduler.reschedule(applicationContext, settings.observe().first(), Instant.now().plusSeconds(60))
-        return Result.success()
+        return try {
+            DropNotifyScheduler.runThenReschedule(
+                job = {
+                    DropNotifyJob(
+                        settings, e.pressureRepository(), NotifyStateStore(applicationContext.notifyMetaDataStore),
+                        AndroidNotifier(applicationContext),
+                    ).run(intended)
+                },
+                // 翌日分。自分自身 (実行中) を REPLACE で置き換えないよう APPEND_OR_REPLACE。
+                reschedule = {
+                    DropNotifyScheduler.reschedule(
+                        applicationContext, settings.observe().first(), Instant.now().plusSeconds(60),
+                        policy = ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    )
+                },
+            )
+            Result.success()
+        } catch (e: Exception) {
+            Result.success() // 失敗扱いにしてバックオフで二重実行しない。翌日分は予約済み。
+        }
     }
 }
 

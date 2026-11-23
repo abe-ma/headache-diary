@@ -53,7 +53,7 @@ class AndroidNotifier(private val context: Context) : Notifier {
         // 通知タップで attack/{id} を開く (UI の deep link: headachediary://attack/{id})。
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("headachediary://attack/$attackId"))
             .setClassName(context.packageName, "${context.packageName}.ui.MainActivity")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pi = PendingIntent.getActivity(
             context, NotificationChannels.effectNotificationId(attackId), intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -62,6 +62,8 @@ class AndroidNotifier(private val context: Context) : Notifier {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notify_effect_title))
             .setContentText(context.getString(R.string.notify_effect_text))
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE) // FR-506
+            .setPublicVersion(publicVersion(NotificationChannels.EFFECT, R.string.notify_public_effect_text))
             .setContentIntent(pi)
             .setAutoCancel(true)
             .build()
@@ -80,11 +82,20 @@ class AndroidNotifier(private val context: Context) : Notifier {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notify_drop_title))
             .setContentText(context.getString(R.string.notify_drop_text, dropHpa))
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE) // FR-506
+            .setPublicVersion(publicVersion(NotificationChannels.DROP, R.string.notify_public_drop_text))
             .setContentIntent(pi)
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(NotificationChannels.dropNotificationId(), n)
     }
+
+    /** FR-506: ロック画面用の公開版 (薬・服薬・症状の語を含めない)。 */
+    private fun publicVersion(channel: String, textRes: Int) = NotificationCompat.Builder(context, channel)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setContentTitle(context.getString(R.string.notify_public_title))
+        .setContentText(context.getString(textRes))
+        .build()
 
     override fun cancelEffectReminder(attackId: Long) {
         NotificationManagerCompat.from(context).cancel(NotificationChannels.effectNotificationId(attackId))

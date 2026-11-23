@@ -47,7 +47,7 @@ data class MonthCount(val yearMonth: YearMonth, val count: Int)
 
 data class Settings(
     val prefectureCode: String?, // JIS X 0401 の2桁 "01".."47"。未設定可
-    val effectReminderEnabled: Boolean = true,
+    val effectReminderEnabled: Boolean = false, // FR-505: 既定オフ (権限要求のため)
     val effectReminderDelayMinutes: Int = 120, // FR-500
     val dropNotifyEnabled: Boolean = false, // FR-501 (権限要求のため既定オフ)
     val dropThresholdHpa: Double = 6.0,

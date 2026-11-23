@@ -202,6 +202,7 @@ class RoomRepositoriesTest {
 
     @Test
     fun FR_500_reminder_scheduled_when_unrated_cancelled_when_rated_or_deleted() = runBlocking {
+        settings.update { it.copy(effectReminderEnabled = true) }
         val id = attacks.save(attack(t0, med("ロキソニン")))
         assertEquals(listOf(id to 120), reminders.scheduled)
         val saved = attacks.observeAttack(id).first()!!
@@ -213,7 +214,7 @@ class RoomRepositoriesTest {
 
     @Test
     fun FR_500_reminder_respects_settings_delay_and_disabled() = runBlocking {
-        settings.update { it.copy(effectReminderDelayMinutes = 45) }
+        settings.update { it.copy(effectReminderEnabled = true, effectReminderDelayMinutes = 45) }
         val id = attacks.save(attack(t0, med("ロキソニン")))
         assertEquals(listOf(id to 45), reminders.scheduled)
         settings.update { it.copy(effectReminderEnabled = false) }
@@ -244,7 +245,7 @@ class RoomRepositoriesTest {
     @Test
     fun FR_100_settings_defaults_roundtrip_and_clear_prefecture() = runBlocking {
         val d = settings.observe().first()
-        assertNull(d.prefectureCode); assertEquals(120, d.effectReminderDelayMinutes)
+        assertNull(d.prefectureCode); assertEquals(120, d.effectReminderDelayMinutes); assertFalse(d.effectReminderEnabled)
         assertEquals(false, d.dropNotifyEnabled); assertEquals(6.0, d.dropThresholdHpa, 0.0)
         assertEquals(LocalTime.of(20, 0), d.dropNotifyTime)
         settings.update { it.copy(prefectureCode = "13", dropNotifyEnabled = true, dropThresholdHpa = 4.5, dropNotifyTime = LocalTime.of(7, 30)) }

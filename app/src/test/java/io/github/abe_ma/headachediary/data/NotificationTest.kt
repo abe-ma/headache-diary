@@ -11,6 +11,7 @@ import io.github.abe_ma.headachediary.data.db.AttackEntity
 import io.github.abe_ma.headachediary.data.db.IntakeEntity
 import io.github.abe_ma.headachediary.data.fake.FakePressureRepository
 import io.github.abe_ma.headachediary.data.notify.DropNotifyJob
+import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler.runThenReschedule
 import io.github.abe_ma.headachediary.data.notify.DropNotifyJob.Result
 import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler
 import io.github.abe_ma.headachediary.data.notify.EffectReminderJob
@@ -26,6 +27,7 @@ import io.github.abe_ma.headachediary.domain.ReminderScheduler
 import io.github.abe_ma.headachediary.domain.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -213,6 +215,7 @@ class NotificationTest {
 
     @Test
     fun FR_500_effect_reminder_fires_only_if_still_unrated_and_enabled_and_attack_exists() = runBlocking {
+        settings.update { it.copy(effectReminderEnabled = true) }
         val j = EffectReminderJob(db, settings, notifier)
         insertAttack(1, at(today, 10), "UNRATED")
         insertAttack(2, at(today, 10), "EFFECTIVE")
@@ -256,7 +259,7 @@ class NotificationTest {
         insertAttack(2, now.minusSeconds(3600), "UNRATED") // 既に記録あり
         insertAttack(3, now.minusSeconds(3600), "EFFECTIVE")
         insertAttack(4, now.minusSeconds(13 * 3600L), "UNRATED") // 古い
-        settings.update { it.copy(effectReminderDelayMinutes = 90, dropNotifyEnabled = true) }
+        settings.update { it.copy(effectReminderEnabled = true, effectReminderDelayMinutes = 90, dropNotifyEnabled = true) }
         val r = RecordingReminders(); var dropScheduled: Settings? = null
         NotifyBootstrapJob(db, settings, r, { it == 2L }, { dropScheduled = it }, { now }).run()
         assertEquals(listOf(1L to 90), r.scheduled)
@@ -281,5 +284,24 @@ class NotificationTest {
         repo.update { it.copy(prefectureCode = "13") } // 変化なし
         repo.update { it.copy(prefectureCode = "27") }
         assertEquals(listOf<Pair<String?, String?>>(null to "13", "13" to "27"), calls)
+    }
+
+    @Test
+    fun FR_501_next_day_is_rescheduled_even_if_job_throws_but_not_on_cancellation() = runBlocking {
+        var rescheduled = 0
+        val r = runCatching { runThenReschedule(job = { throw IllegalStateException("datastore") }, reschedule = { rescheduled++ }) }
+        assertTrue(r.exceptionOrNull() is IllegalStateException)
+        assertEquals(1, rescheduled)
+        runThenReschedule(job = { }, reschedule = { rescheduled++ })
+        assertEquals(2, rescheduled)
+        val c = runCatching { runThenReschedule(job = { throw kotlinx.coroutines.CancellationException("x") }, reschedule = { rescheduled++ }) }
+        assertTrue(c.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertEquals(2, rescheduled) // キャンセル時は予約しない
+    }
+
+    @Test
+    fun FR_505_notification_settings_default_to_off() = runBlocking {
+        val d = settings.observe().first()
+        assertFalse(d.effectReminderEnabled); assertFalse(d.dropNotifyEnabled)
     }
 }
