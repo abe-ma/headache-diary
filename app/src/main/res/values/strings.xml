@@ -137,14 +137,13 @@
     <string name="stats_section_pressure">気圧の推移と発作</string>
     <string name="stats_period_week">1週間</string>
     <string name="stats_period_month">1か月</string>
-    <string name="stats_period_note">過去の期間と、予報3日分を表示します。</string>
+    <string name="stats_period_note">過去の期間と、予報3日分を表示します。気圧は取得を始めた日以降の分だけ表示されます。</string>
     <string name="stats_legend_actual">気圧(取得済み)</string>
     <string name="stats_legend_forecast">気圧(予報)</string>
     <string name="stats_legend_attack">発作</string>
     <string name="stats_legend_now">現在</string>
     <string name="stats_axis_unit">縦軸: 気圧 (hPa)</string>
-    <string name="stats_pressure_chart_description">気圧と発作の重ね合わせグラフ。期間内の最低 %1$s hPa、最高 %2$s hPa、発作 %3$d件。</string>
-    <string name="stats_pressure_chart_description_no_data">気圧と発作の重ね合わせグラフ。気圧のデータはありません。発作 %1$d件。</string>
+    <string name="stats_pressure_chart_description">気圧と発作の重ね合わせグラフ。過去%1$d日と予報%2$d日を表示。期間内の最低 %3$s hPa、最高 %4$s hPa、発作 %5$d件。</string>
     <string name="stats_attack_count">この期間の発作: %1$d件</string>
     <string name="stats_pressure_empty">気圧のデータがまだありません。</string>
     <string name="stats_last_fetched">気圧の最終取得: %1$s</string>

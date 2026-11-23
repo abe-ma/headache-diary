@@ -26,12 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.ui.openUriSafely
 import io.github.abe_ma.headachediary.ui.formatListDateTime
 import java.time.Instant
 import java.time.ZoneId
@@ -140,6 +142,8 @@ fun StatsContent(
                 val hpa = state.pressure.map { it.hpa }
                 val description = stringResource(
                     R.string.stats_pressure_chart_description,
+                    state.pressurePeriod.pastDays.toInt(),
+                    FORECAST_DAYS.toInt(),
                     String.format(Locale.JAPAN, "%.0f", hpa.min()),
                     String.format(Locale.JAPAN, "%.0f", hpa.max()),
                     state.attacks.size,
@@ -169,7 +173,7 @@ fun StatsContent(
             )
             // FR-106: 気圧グラフの近くに出典リンク (CC BY 4.0)
             TextButton(
-                onClick = { uriHandler.openUri(OPEN_METEO_URL) },
+                onClick = { uriHandler.openUriSafely(OPEN_METEO_URL) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_OPEN_METEO),
             ) { Text(stringResource(R.string.stats_open_meteo_link), style = MaterialTheme.typography.titleSmall) }
         }
@@ -225,7 +229,8 @@ private fun Legend() {
 @Composable
 private fun LegendItem(symbol: String, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(symbol, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        // 記号は読み上げ対象外にし、ラベルだけを読ませる (「ボックス描画…」などと読まれるのを防ぐ)。
+        Text(symbol, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clearAndSetSemantics {})
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.ui.openUriSafely
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -235,7 +236,7 @@ fun ExportContent(
             )
             // FR-403: 書き出し画面にも Open-Meteo の帰属表示
             TextButton(
-                onClick = { uriHandler.openUri(OPEN_METEO_URL) },
+                onClick = { uriHandler.openUriSafely(OPEN_METEO_URL) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_EXPORT_ATTRIBUTION),
             ) { Text(stringResource(R.string.export_attribution), style = MaterialTheme.typography.titleSmall) }
         }

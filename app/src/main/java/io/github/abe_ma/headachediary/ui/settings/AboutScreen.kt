@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.abe_ma.headachediary.BuildConfig
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.ui.openUriSafely
 
 const val TAG_OPEN_METEO_LINK = "about_open_meteo_link"
 
@@ -61,7 +62,7 @@ fun AboutScreen(onBack: () -> Unit, versionName: String = BuildConfig.VERSION_NA
 
             Heading(stringResource(R.string.about_section_weather))
             TextButton(
-                onClick = { uriHandler.openUri(url) },
+                onClick = { uriHandler.openUriSafely(url) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_OPEN_METEO_LINK),
             ) { Text(stringResource(R.string.about_weather_attribution), style = MaterialTheme.typography.titleMedium) }
             Text(stringResource(R.string.about_weather_license), style = MaterialTheme.typography.bodyMedium)

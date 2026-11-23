@@ -17,6 +17,7 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class StatsViewModelTest {
@@ -106,6 +107,31 @@ class StatsViewModelTest {
             assertNull(expectMostRecentItem().lastFetchedAt)
             f.pressure.lastFetched.value = now
             assertEquals(now, expectMostRecentItem().lastFetchedAt)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    /** 進められる時計 (月またぎのテスト用)。 */
+    private class MutableClock(var current: Instant, private val z: ZoneId) : Clock() {
+        override fun getZone(): ZoneId = z
+        override fun withZone(zone: ZoneId): Clock = MutableClock(current, zone)
+        override fun instant(): Instant = current
+    }
+
+    @Test
+    fun FR300_画面を開いたまま月をまたいだら月別の範囲を取り直す() = runTest {
+        val zone = ZoneId.of("Asia/Tokyo")
+        val mc = MutableClock(Instant.parse("2026-11-30T14:00:00Z"), zone) // 11/30 23:00 JST
+        val pressure = FakePressureRepository()
+        val attacks = io.github.abe_ma.headachediary.data.fake.FakeAttackRepository(pressure, zone) { mc.instant() }
+        val f = FakeRepositories(pressure = pressure, attacks = attacks)
+        val vm = StatsViewModel(f.attacks, f.pressure, f.settings, mc)
+        vm.uiState.test {
+            assertEquals(java.time.YearMonth.of(2026, 11), expectMostRecentItem().monthlyCounts.last().yearMonth)
+            mc.current = Instant.parse("2026-11-30T16:00:00Z") // 12/1 01:00 JST
+            main.dispatcher.scheduler.advanceTimeBy(61_000)
+            main.dispatcher.scheduler.runCurrent()
+            assertEquals(java.time.YearMonth.of(2026, 12), expectMostRecentItem().monthlyCounts.last().yearMonth)
             cancelAndIgnoreRemainingEvents()
         }
     }

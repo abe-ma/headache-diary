@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,15 +47,17 @@ fun PressureChart(
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
     val nowColor = MaterialTheme.colorScheme.onSurface
+    // フォントを大きくしたとき軸ラベルが重なる/切れるのを防ぐため、高さと余白を文字倍率に合わせる (最大 2 倍)。
+    val scale = LocalDensity.current.fontScale.coerceIn(1f, 2f)
 
     Canvas(
-        modifier.fillMaxWidth().height(240.dp).testTag(TAG_PRESSURE_CHART)
+        modifier.fillMaxWidth().height(240.dp * scale).testTag(TAG_PRESSURE_CHART)
             .semantics { contentDescription = description },
     ) {
-        val left = 44.dp.toPx()
+        val left = 44.dp.toPx() * scale
         val right = 8.dp.toPx()
-        val top = 22.dp.toPx() // 発作マーカーの置き場
-        val bottom = 26.dp.toPx()
+        val top = 22.dp.toPx() * scale // 発作マーカーの置き場
+        val bottom = 26.dp.toPx() * scale
         val plotW = size.width - left - right
         val plotH = size.height - top - bottom
         val labelStyle = TextStyle(color = textColor, fontSize = 11.sp)
@@ -115,19 +118,23 @@ fun PressureChart(
             )
         }
 
-        // 発作マーカー: 縦の細線 + 上端の ▼
-        attackTimes.forEach { t ->
-            if (t < start || t > end) return@forEach
-            val ax = x(t)
-            drawLine(markerColor.copy(alpha = 0.55f), Offset(ax, top), Offset(ax, top + plotH), strokeWidth = 1.5.dp.toPx())
+        // 発作マーカー: 縦の細線 + 上端の ▼。近接するものは 1 つにまとめ、2 件以上なら件数を添える。
+        val inRange = attackTimes.filter { it in start..end }
+        clusterMarkers(inRange.map { x(it) }, minGap = 14.dp.toPx()).forEach { c ->
+            drawLine(markerColor.copy(alpha = 0.55f), Offset(c.x, top), Offset(c.x, top + plotH), strokeWidth = 1.5.dp.toPx())
             val s = 7.dp.toPx()
             val tri = Path().apply {
-                moveTo(ax - s, top - s * 1.6f)
-                lineTo(ax + s, top - s * 1.6f)
-                lineTo(ax, top)
+                moveTo(c.x - s, top - s * 1.6f)
+                lineTo(c.x + s, top - s * 1.6f)
+                lineTo(c.x, top)
                 close()
             }
             drawPath(tri, markerColor)
+            if (c.count > 1) {
+                val t = textMeasurer.measure("×${c.count}", labelStyle.copy(color = markerColor))
+                val tx = (c.x + s + 2.dp.toPx()).coerceAtMost(size.width - t.size.width)
+                drawText(t, topLeft = Offset(tx, top - t.size.height.toFloat()))
+            }
         }
     }
 }

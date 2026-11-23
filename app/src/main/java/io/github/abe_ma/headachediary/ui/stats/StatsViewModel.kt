@@ -10,7 +10,10 @@ import io.github.abe_ma.headachediary.domain.PressurePoint
 import io.github.abe_ma.headachediary.domain.PressureRepository
 import io.github.abe_ma.headachediary.domain.SettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 
 /** 月別グラフに出す月数 (FR-300: 切り替えて遡れる)。 */
@@ -30,6 +34,9 @@ enum class MonthSpan(val months: Int) { SIX(6), TWELVE(12), TWENTY_FOUR(24) }
 enum class PressurePeriod(val pastDays: Long) { WEEK(7), MONTH(30) }
 
 const val FORECAST_DAYS = 3L
+
+/** 日付変更を確かめる間隔。 */
+private const val DAY_CHECK_INTERVAL_MILLIS = 60_000L
 
 data class StatsUiState(
     val isLoading: Boolean = true,
@@ -67,13 +74,23 @@ class StatsViewModel internal constructor(
     private val monthSpan = MutableStateFlow(MonthSpan.SIX)
     private val period = MutableStateFlow(PressurePeriod.WEEK)
 
-    private val monthly = monthSpan.flatMapLatest { span ->
-        attackRepository.observeMonthlyCounts(span.months).map { span to it }
-    }
+    /**
+     * 今日の日付。画面を開いたまま日付 (月) をまたいだとき、月別の範囲と気圧の期間を取り直すために使う。
+     * (Repository は購読時点の現在月で範囲を決めるため、再購読が必要。)
+     */
+    private val today = flow {
+        while (true) {
+            emit(LocalDate.now(clock))
+            delay(DAY_CHECK_INTERVAL_MILLIS)
+        }
+    }.distinctUntilChanged()
+
+    private val monthly = combine(monthSpan, today.map { java.time.YearMonth.from(it) }.distinctUntilChanged()) { span, _ -> span }
+        .flatMapLatest { span -> attackRepository.observeMonthlyCounts(span.months).map { span to it } }
 
     private data class Window(val period: PressurePeriod, val now: Instant, val start: Instant, val end: Instant)
 
-    private val window = period.map { p ->
+    private val window = combine(period, today) { p, _ ->
         val now = clock.instant()
         Window(p, now, now.minus(Duration.ofDays(p.pastDays)), now.plus(Duration.ofDays(FORECAST_DAYS)))
     }

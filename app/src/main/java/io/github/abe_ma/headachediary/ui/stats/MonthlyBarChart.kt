@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -52,19 +53,20 @@ fun MonthlyBarChart(counts: List<MonthCount>, modifier: Modifier = Modifier) {
     val summary = counts.joinToString("、") { itemFmt.format(label(it, true), unitFmt.format(it.count)) }
     val description = stringResource(R.string.stats_monthly_chart_description, summary)
 
+    val scale = LocalDensity.current.fontScale.coerceIn(1f, 2f) // フォント拡大時に数字・ラベルが切れないよう余白と幅を広げる
     val scroll = rememberScrollState()
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val contentWidth = max(maxWidth.value, BAR_SLOT_WIDTH.value * counts.size).dp
+        val contentWidth = max(maxWidth.value, BAR_SLOT_WIDTH.value * scale * counts.size).dp
         // 最新の月 (右端) が見える位置から始める。
         LaunchedEffect(counts.size, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
         Canvas(
-            Modifier.horizontalScroll(scroll).width(contentWidth).height(200.dp)
+            Modifier.horizontalScroll(scroll).width(contentWidth).height(200.dp * scale)
                 .testTag(TAG_MONTHLY_CHART)
                 .semantics { contentDescription = description },
         ) {
             if (counts.isEmpty()) return@Canvas
-            val labelH = 36.dp.toPx()
-            val topH = 22.dp.toPx() // 数字の置き場
+            val labelH = 36.dp.toPx() * scale
+            val topH = 22.dp.toPx() * scale // 数字の置き場
             val plotH = size.height - labelH - topH
             val slot = size.width / counts.size
             val barW = slot * 0.5f

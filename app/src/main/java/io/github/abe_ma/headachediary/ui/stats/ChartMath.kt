@@ -64,3 +64,25 @@ fun <T> splitByGap(points: List<T>, time: (T) -> Instant, maxGap: Duration = Dur
     }
     return segments
 }
+
+/** 近接した発作マーカーを 1 つにまとめた結果。x は代表位置、count は束ねた件数。 */
+data class MarkerCluster(val x: Float, val count: Int)
+
+/**
+ * 横位置が [minGap] 未満で並ぶマーカーをまとめる (密集時に重なって見えなくなるのを防ぐ)。
+ * まとめたものは件数を添えて描く。入力は未ソートでよい。
+ */
+fun clusterMarkers(xs: List<Float>, minGap: Float): List<MarkerCluster> {
+    if (xs.isEmpty()) return emptyList()
+    val sorted = xs.sorted()
+    val out = mutableListOf<MarkerCluster>()
+    var group = mutableListOf(sorted.first())
+    for (i in 1 until sorted.size) {
+        if (sorted[i] - group.first() < minGap) group += sorted[i] else {
+            out += MarkerCluster(group.average().toFloat(), group.size)
+            group = mutableListOf(sorted[i])
+        }
+    }
+    out += MarkerCluster(group.average().toFloat(), group.size)
+    return out
+}

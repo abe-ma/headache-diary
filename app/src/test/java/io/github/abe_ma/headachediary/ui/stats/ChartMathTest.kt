@@ -56,4 +56,15 @@ class ChartMathTest {
         assertEquals(listOf(3, 2), segments.map { it.size })
         assertTrue(splitByGap(emptyList<Instant>(), { it }).isEmpty())
     }
+
+    @Test
+    fun FR103_近接した発作マーカーは件数つきで1つにまとめる() {
+        assertTrue(clusterMarkers(emptyList(), 14f).isEmpty())
+        val clusters = clusterMarkers(listOf(100f, 50f, 104f, 300f, 105f), 14f) // 未ソートでもよい
+        assertEquals(3, clusters.size)
+        assertEquals(listOf(1, 3, 1), clusters.map { it.count })
+        assertEquals(103f, clusters[1].x, 1.5f)
+        // 離れていればそのまま
+        assertEquals(listOf(1, 1), clusterMarkers(listOf(10f, 40f), 14f).map { it.count })
+    }
 }
