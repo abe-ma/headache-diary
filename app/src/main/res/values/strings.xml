@@ -151,6 +151,36 @@
     <string name="stats_last_fetched_none">気圧はまだ取得していません</string>
     <string name="stats_open_meteo_link">Weather data by Open-Meteo.com</string>
 
+    <!-- 書き出し (FR-400〜403, 209) -->
+    <string name="export_title">記録の書き出し</string>
+    <string name="export_section_period">期間</string>
+    <string name="export_preset_this_month">今月</string>
+    <string name="export_preset_last_3_months">過去3か月</string>
+    <string name="export_preset_last_year">過去1年</string>
+    <string name="export_preset_all">全期間</string>
+    <string name="export_preset_custom">期間を指定</string>
+    <string name="export_custom_start">開始日</string>
+    <string name="export_custom_end">終了日</string>
+    <string name="export_range_invalid">開始日は終了日より前の日付にしてください。</string>
+    <string name="export_range_summary">対象: %1$s 〜 %2$s</string>
+    <string name="export_attack_count">この期間の発作: %1$d件</string>
+    <string name="export_attack_count_zero">この期間の発作の記録はありません。このまま書き出すこともできます。</string>
+    <string name="export_section_format">形式</string>
+    <string name="export_format_csv">CSV</string>
+    <string name="export_format_pdf">PDF</string>
+    <string name="export_format_csv_desc">表計算ソフトで開けます</string>
+    <string name="export_format_pdf_desc">受診時に見せる用です</string>
+    <string name="export_action">書き出して共有</string>
+    <string name="export_generating">作成しています…</string>
+    <string name="export_failed">書き出せませんでした。もう一度お試しください。</string>
+    <string name="export_done">ファイルを作成しました。</string>
+    <string name="export_share_again">もう一度共有する</string>
+    <string name="export_share_title">書き出したファイルを共有</string>
+    <string name="export_share_no_app">共有できるアプリが見つかりませんでした。</string>
+    <string name="export_privacy_note">書き出したファイルには健康に関する記録が含まれます。共有先はあなたが選びます。アプリが自動で外部へ送信することはありません。</string>
+    <string name="export_attribution">気圧データ: Weather data by Open-Meteo.com</string>
+    <string name="export_date_format">%1$d年%2$d月%3$d日</string>
+
     <!-- 薬選択 (FR-203, 206) -->
     <string name="picker_title">薬を選ぶ</string>
     <string name="picker_search_hint">薬の名前を検索、または入力</string>

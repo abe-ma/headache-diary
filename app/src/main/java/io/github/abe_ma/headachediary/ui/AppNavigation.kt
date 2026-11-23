@@ -1,9 +1,7 @@
 package io.github.abe_ma.headachediary.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -16,7 +14,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -32,6 +29,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.ui.edit.AttackEditScreen
+import io.github.abe_ma.headachediary.ui.export.ExportScreen
 import io.github.abe_ma.headachediary.ui.edit.AttackEditViewModel
 import io.github.abe_ma.headachediary.ui.records.RecordListScreen
 import io.github.abe_ma.headachediary.ui.settings.AboutScreen
@@ -45,7 +43,6 @@ object Routes {
     const val SETTINGS = "settings"
     const val MEDICATIONS = "settings/medications"
     const val ABOUT = "settings/about"
-    /** 書き出し (T-09b が実画面に置き換える)。 */
     const val EXPORT = "export"
     const val ATTACK = "attack/{${AttackEditViewModel.ARG_ID}}"
     fun attack(id: Long) = "attack/$id"
@@ -105,7 +102,7 @@ fun AppRoot() {
             }
             composable(Routes.MEDICATIONS) { MedicationManageScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.EXPORT) { ComingSoon() }
+            composable(Routes.EXPORT) { ExportScreen(onBack = { navController.popBackStack() }) }
             composable(
                 Routes.ATTACK,
                 arguments = listOf(navArgument(AttackEditViewModel.ARG_ID) { type = NavType.LongType }),
@@ -126,9 +123,3 @@ private fun NavHostController.navigateToTab(route: String) {
     }
 }
 
-@Composable
-private fun ComingSoon() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(stringResource(R.string.placeholder_coming_soon))
-    }
-}
