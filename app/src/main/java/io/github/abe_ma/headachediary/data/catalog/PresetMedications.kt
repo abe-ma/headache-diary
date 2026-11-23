@@ -13,7 +13,7 @@ data class PresetMedication(val name: String, val ingredient: String)
 val PRESET_MEDICATIONS: List<PresetMedication> = listOf(
     PresetMedication("カロナール", "アセトアミノフェン"),
     PresetMedication("タイレノール", "アセトアミノフェン"),
-    PresetMedication("イブ", "イブプロフェン"),
+    PresetMedication("イブ", "イブプロフェン (シリーズにより成分が異なる)"),
     PresetMedication("EVE", "イブプロフェン (シリーズにより成分が異なる)"),
     PresetMedication("バファリン", "シリーズにより成分が異なる"),
     PresetMedication("ロキソニン", "ロキソプロフェンナトリウム水和物"),

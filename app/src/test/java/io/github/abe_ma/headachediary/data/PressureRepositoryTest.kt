@@ -48,7 +48,7 @@ class PressureRepositoryTest {
     private lateinit var db: AppDatabase
     private lateinit var settings: DataStoreSettingsRepository
     private lateinit var repo: RoomPressureRepository
-    private val now = Instant.parse("2026-11-23T03:00:00Z")
+    private var now = Instant.parse("2026-11-23T03:00:00Z")
     // 2026-11-23T00:00:00Z = 1795392000 (秒)
     private val base = Instant.parse("2026-11-23T00:00:00Z").epochSecond
 
@@ -225,5 +225,47 @@ class PressureRepositoryTest {
         assertEquals(NetworkType.CONNECTED, info.constraints.requiredNetworkType)
         assertNotNull(info.periodicityInfo)
         assertEquals(24 * 3600 * 1000L, info.periodicityInfo!!.repeatIntervalMillis)
+    }
+
+    @Test
+    fun FR_105_storage_failure_returns_failure_instead_of_throwing() = runBlocking {
+        settings.update { it.copy(prefectureCode = "13") }
+        val failingDao = object : io.github.abe_ma.headachediary.data.db.PressureDao by db.pressureDao() {
+            override suspend fun upsertAll(rows: List<io.github.abe_ma.headachediary.data.db.PressureHourEntity>) {
+                throw android.database.sqlite.SQLiteFullException("disk full")
+            }
+        }
+        val r2 = RoomPressureRepository(
+            failingDao, OpenMeteoApi.create(server.url("/").toString()), settings,
+            StaticPrefectureRepository(), store("meta2.preferences_pb"), { now },
+        )
+        server.enqueue(ok(body(1010.0)))
+        assertEquals(RefreshResult.Failure(FailureReason.API_ERROR), r2.refresh())
+        assertNull(r2.observeLastFetchedAt().first()) // 保存失敗なら取得済み扱いにしない
+    }
+
+    @Test
+    fun FR_504_last_fetched_is_per_region() = runBlocking {
+        settings.update { it.copy(prefectureCode = "13") }
+        server.enqueue(ok(body(1010.0))); repo.refresh()
+        assertEquals(now, repo.observeLastFetchedAt().first())
+        settings.update { it.copy(prefectureCode = "27") } // 新地域: 未取得
+        assertNull(repo.observeLastFetchedAt().first())
+        server.enqueue(MockResponse().setResponseCode(500)); repo.refresh() // 失敗しても旧地域の時刻は見えない
+        assertNull(repo.observeLastFetchedAt().first())
+        settings.update { it.copy(prefectureCode = "13") }
+        assertEquals(now, repo.observeLastFetchedAt().first())
+    }
+
+    @Test
+    fun FR_102_past_days_widens_after_a_long_gap_up_to_92() = runBlocking {
+        settings.update { it.copy(prefectureCode = "13") }
+        server.enqueue(ok(body(1010.0))); repo.refresh() // 初回 31
+        now = now.plusSeconds(10 * 86400L)
+        server.enqueue(ok(body(1010.0))); repo.refresh() // 10 日ぶり → 11
+        now = now.plusSeconds(200 * 86400L)
+        server.enqueue(ok(body(1010.0))); repo.refresh() // 200 日ぶり → 上限 92
+        assertEquals(listOf("31", "11", "92"), (1..3).map { server.takeRequest().requestUrl!!.queryParameter("past_days") })
+        assertEquals(7, RoomPressureRepository.pastDaysFor(now.minusSeconds(3600), now))
     }
 }

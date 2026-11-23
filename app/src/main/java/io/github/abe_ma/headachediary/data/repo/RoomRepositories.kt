@@ -47,7 +47,11 @@ class RoomMedicationRepository(private val db: AppDatabase) : MedicationReposito
     override suspend fun addCustom(name: String): Medication = db.withTransaction {
         val trimmed = name.trim()
         require(trimmed.isNotEmpty()) { "薬名が空です" }
-        dao.findByName(trimmed)?.let { return@withTransaction it.toDomain() }
+        dao.findByName(trimmed)?.let {
+            // 非表示の薬を明示的に入力した場合は再表示する (候補に出ないまま記録だけ作られるのを防ぐ)。
+            if (it.isHidden) dao.setHidden(it.id, false)
+            return@withTransaction it.copy(isHidden = false).toDomain()
+        }
         val id = maxOf((dao.maxId() ?: 0L) + 1, CUSTOM_MEDICATION_ID_START)
         val entity = MedicationEntity(id, trimmed, null, isPreset = false, isHidden = false)
         dao.insert(entity)

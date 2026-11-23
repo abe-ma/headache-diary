@@ -56,8 +56,10 @@ class FakeMedicationRepository(
         medications.update { list ->
             val existing = list.firstOrNull { it.name == trimmed }
             if (existing != null) {
-                result = existing
-                list
+                // 実装 (Room) と同じく、非表示の薬を明示入力したら再表示する。
+                val shown = existing.copy(isHidden = false)
+                result = shown
+                list.map { if (it.id == existing.id) shown else it }
             } else {
                 val created = Medication(
                     id = (list.maxOfOrNull { it.id } ?: 0L) + 1,
@@ -91,7 +93,10 @@ class FakeAttackRepository(
     override suspend fun save(attack: Attack): Long {
         val id = if (attack.id == 0L) nextAttackId++ else attack.id
         val intakes = attack.intakes.map { if (it.id == 0L) it.copy(id = nextIntakeId++) else it }
-        val hpa = attack.pressureHpa ?: pressure?.pressureAt(attack.startedAt)
+        // 実装 (Room) と同じ: 日時を変えた編集では保存済みの気圧を捨てて再解決する。
+        val old = state.value.firstOrNull { it.id == id }
+        val keep = if (old != null && old.startedAt != attack.startedAt) null else attack.pressureHpa
+        val hpa = keep ?: pressure?.pressureAt(attack.startedAt)
         val saved = attack.copy(id = id, intakes = intakes, pressureHpa = hpa)
         state.update { list -> list.filter { it.id != id } + saved }
         return id
@@ -139,7 +144,7 @@ class FakeSettingsRepository(initial: Settings = Settings(prefectureCode = null)
     }
 }
 
-/** 実ファイルは作らず固定の Uri を返す。 */
+/** 実ファイルは作らず固定の Uri を返す。`Uri.parse` を使うため、素の JUnit ではなく Robolectric 配下で使うこと。 */
 class FakeExportRepository : ExportRepository {
     override suspend fun exportCsv(range: ClosedRange<Instant>): Uri = Uri.parse("content://fake/export.csv")
     override suspend fun exportPdf(range: ClosedRange<Instant>): Uri = Uri.parse("content://fake/export.pdf")

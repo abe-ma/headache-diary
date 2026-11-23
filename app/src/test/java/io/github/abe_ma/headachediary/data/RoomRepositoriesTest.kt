@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -283,5 +284,25 @@ class RoomRepositoriesTest {
         meds.addCustom("ナプロキセン（ナイキサン）") // 新名を自由入力が先に占有
         PresetSeedCallback.onOpen(w) // 例外にならない
         assertEquals("ナイキサン", meds.observeAll().first().first { it.id == 7L }.name)
+    }
+
+    @Test
+    fun FR_207_addCustom_of_hidden_medication_unhides_it() = runBlocking {
+        val loxo = med("ロキソニン")
+        meds.setHidden(loxo.id, true)
+        val again = meds.addCustom("ロキソニン")
+        assertEquals(loxo.id, again.id)
+        assertFalse(again.isHidden)
+        assertTrue(meds.observeCandidates().first().any { it.id == loxo.id })
+    }
+
+    @Test
+    fun FR_203_preset_sync_does_not_rewrite_unchanged_rows() = runBlocking {
+        val w = db.openHelper.writableDatabase
+        w.execSQL("CREATE TEMP TABLE upd_log (n INTEGER)")
+        w.execSQL("CREATE TEMP TRIGGER t AFTER UPDATE ON main.medication BEGIN INSERT INTO upd_log VALUES (1); END")
+        PresetSeedCallback.onOpen(w)
+        val n = w.query("SELECT COUNT(*) FROM upd_log").use { it.moveToFirst(); it.getInt(0) }
+        assertEquals(0, n)
     }
 }

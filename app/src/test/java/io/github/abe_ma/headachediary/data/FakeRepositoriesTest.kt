@@ -82,13 +82,13 @@ class FakeRepositoriesTest {
     }
 
     @Test
-    fun FR_207_hidden_custom_medication_stays_hidden_on_readd() = runTest {
+    fun FR_207_readding_hidden_custom_medication_unhides_it() = runTest {
         val r = FakeRepositories()
         val a = r.medications.addCustom("X")
         r.medications.setHidden(a.id, true)
         val again = r.medications.addCustom("X")
         assertEquals(a.id, again.id)
-        assertTrue(r.medications.observeCandidates().first().none { it.id == a.id })
+        assertTrue(r.medications.observeCandidates().first().any { it.id == a.id })
     }
 
     @Test
@@ -227,5 +227,25 @@ class FakeRepositoriesTest {
         )
         assertEquals((16L..22L).toList(), meds.drop(15).map { it.id })
         assertTrue(meds.drop(15).all { it.ingredient == "漢方" })
+    }
+
+    @Test
+    fun FR_104_fake_recomputes_pressure_when_time_changes_like_room() = runTest {
+        val pressure = io.github.abe_ma.headachediary.data.fake.FakePressureRepository(listOf(PressurePoint(t0, 1008.0)))
+        val r = FakeRepositories(pressure = pressure)
+        val id = r.attacks.save(attack(t0))
+        val saved = r.attacks.observeAttack(id).first()!!
+        assertEquals(1008.0, saved.pressureHpa!!, 0.0)
+        r.attacks.save(saved.copy(startedAt = t0.plusSeconds(10 * 3600)))
+        assertNull(r.attacks.observeAttack(id).first()!!.pressureHpa)
+    }
+
+    @Test
+    fun FR_207_fake_addCustom_unhides_hidden_medication() = runTest {
+        val r = FakeRepositories()
+        val loxo = r.medications.observeAll().first().first { it.name == "ロキソニン" }
+        r.medications.setHidden(loxo.id, true)
+        assertTrue(!r.medications.addCustom("ロキソニン").isHidden)
+        assertTrue(r.medications.observeCandidates().first().any { it.id == loxo.id })
     }
 }
