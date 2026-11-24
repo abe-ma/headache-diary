@@ -54,6 +54,9 @@ class PressureRefreshJob(
 
         /** Result.retry() の上限 (指数バックオフ 15分〜)。超えたら次の日次実行に任せる。 */
         const val MAX_RETRIES = 4
+
+        /** 失敗後に再試行するか。runAttemptCount は 0 始まりの実行回数。上限に達したら成功扱いで終え、翌日の定期実行に任せる。 */
+        fun shouldRetry(runAttemptCount: Int): Boolean = runAttemptCount < MAX_RETRIES
     }
 }
 
@@ -75,7 +78,7 @@ class PressureRefreshWorker(context: Context, params: WorkerParameters) : Corout
         return when (PressureRefreshJob(ep.pressureRepository(), ep.database()).run()) {
             PressureRefreshJob.Outcome.DONE -> Result.success()
             // 失敗が続く場合は上限で打ち切る (日次の定期実行が翌日また試す)。
-            PressureRefreshJob.Outcome.RETRY -> if (runAttemptCount < PressureRefreshJob.MAX_RETRIES) Result.retry() else Result.success()
+            PressureRefreshJob.Outcome.RETRY -> if (PressureRefreshJob.shouldRetry(runAttemptCount)) Result.retry() else Result.success()
         }
     }
 }

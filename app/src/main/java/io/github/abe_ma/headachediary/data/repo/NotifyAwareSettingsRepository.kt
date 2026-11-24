@@ -19,6 +19,15 @@ class NotifyAwareSettingsRepository(
         val old = delegate.observe().first()
         delegate.update(transform)
         val new = delegate.observe().first()
-        if (old != new) onChanged(old, new)
+        if (old != new) {
+            // 設定は保存済み。副作用の失敗で update を失敗させない (キャンセルは再送出)。
+            try {
+                onChanged(old, new)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("NotifyAwareSettings", "onChanged failed", e)
+            }
+        }
     }
 }

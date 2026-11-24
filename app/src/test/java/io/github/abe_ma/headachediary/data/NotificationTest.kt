@@ -346,7 +346,92 @@ class NotificationTest {
     }
 
     @Test
-    fun FR_105_daily_pressure_work_retry_is_capped() {
-        assertEquals(4, io.github.abe_ma.headachediary.data.work.PressureRefreshJob.MAX_RETRIES)
+    fun FR_105_pressure_work_retries_up_to_the_cap_then_gives_up_until_next_daily_run() {
+        val cap = io.github.abe_ma.headachediary.data.work.PressureRefreshJob.MAX_RETRIES
+        fun retry(n: Int) = io.github.abe_ma.headachediary.data.work.PressureRefreshJob.shouldRetry(n)
+        assertTrue((0 until cap).all { retry(it) }) // 1〜cap 回目の失敗は再試行
+        assertFalse(retry(cap)); assertFalse(retry(cap + 5)) // 上限超えは打ち切り
+    }
+
+    // ---- 設定変更フック (配線を実際に通す) ----
+    private class HookProbe {
+        var pressureNow = 0
+        val dropReschedules = mutableListOf<Settings>()
+        val reminders = RecordingReminders()
+        val cancelled = mutableListOf<Long>()
+        val scheduler = object : ReminderScheduler {
+            override fun scheduleEffectReminder(attackId: Long, delayMinutes: Int) = reminders.scheduleEffectReminder(attackId, delayMinutes)
+            override fun cancelEffectReminder(attackId: Long) { cancelled += attackId }
+        }
+    }
+
+    private fun hookedRepo(
+        probe: HookProbe,
+        now: Instant,
+        enqueuePressureNow: () -> Unit = { probe.pressureNow++ },
+        hasActive: suspend (Long) -> Boolean = { false },
+    ): NotifyAwareSettingsRepository {
+        val handler = io.github.abe_ma.headachediary.data.notify.SettingsChangeHandler(
+            enqueuePressureNow = enqueuePressureNow,
+            rescheduleDrop = { probe.dropReschedules += it },
+            effectSync = EffectReminderSync(db, probe.scheduler) { now },
+            hasActiveEffectWork = hasActive,
+        )
+        return NotifyAwareSettingsRepository(settings) { o, n -> handler(o, n) }
+    }
+
+    @Test
+    fun FR_505_settings_update_runs_all_side_effects_through_the_real_wiring() = runBlocking {
+        val now = at(today, 12)
+        insertAttack(1, now.minusSeconds(600), "UNRATED")
+        val p = HookProbe(); val repo = hookedRepo(p, now)
+        repo.update { it.copy(prefectureCode = "13") }
+        repo.update { it.copy(prefectureCode = "13") } // 変化なし → 何も起きない
+        assertEquals(1, p.pressureNow)
+        repo.update { it.copy(dropNotifyEnabled = true) }
+        assertEquals(1, p.dropReschedules.size); assertTrue(p.dropReschedules[0].dropNotifyEnabled)
+        repo.update { it.copy(effectReminderEnabled = true, effectReminderDelayMinutes = 45) }
+        assertEquals(listOf(1L to 45), p.reminders.scheduled)
+        repo.update { it.copy(effectReminderEnabled = false) }
+        assertEquals(listOf(1L), p.cancelled)
+        assertEquals("13", settings.observe().first().prefectureCode)
+    }
+
+    @Test
+    fun FR_505_side_effect_failures_do_not_break_update_and_do_not_skip_other_effects() = runBlocking {
+        val now = at(today, 12)
+        insertAttack(1, now.minusSeconds(600), "UNRATED")
+        val p = HookProbe()
+        val repo = hookedRepo(p, now, enqueuePressureNow = { throw IllegalStateException("WorkManager not initialized") })
+        repo.update { it.copy(prefectureCode = "13", effectReminderEnabled = true) } // 例外にならない
+        assertEquals("13", settings.observe().first().prefectureCode) // 設定は保存済み
+        assertEquals(listOf(1L to 120), p.reminders.scheduled) // 先に失敗した処理の後も実行される
+    }
+
+    @Test
+    fun FR_505_storage_exception_in_hook_does_not_crash_the_update() = runBlocking {
+        val now = at(today, 12)
+        insertAttack(1, now.minusSeconds(600), "UNRATED")
+        val throwing = object : ReminderScheduler {
+            override fun scheduleEffectReminder(attackId: Long, delayMinutes: Int) { throw android.database.sqlite.SQLiteException("disk full") }
+            override fun cancelEffectReminder(attackId: Long) = Unit
+        }
+        val handler = io.github.abe_ma.headachediary.data.notify.SettingsChangeHandler({ }, { }, EffectReminderSync(db, throwing) { now }, { false })
+        val repo = NotifyAwareSettingsRepository(settings) { o, n -> handler(o, n) }
+        repo.update { it.copy(effectReminderEnabled = true) } // SQLiteException は握られる
+        assertTrue(settings.observe().first().effectReminderEnabled) // 設定は保存済み
+    }
+
+    @Test
+    fun FR_505_cancellation_inside_a_side_effect_is_rethrown() = runBlocking {
+        val p = HookProbe()
+        val h = io.github.abe_ma.headachediary.data.notify.SettingsChangeHandler(
+            enqueuePressureNow = { throw kotlinx.coroutines.CancellationException("cancelled") },
+            rescheduleDrop = { },
+            effectSync = EffectReminderSync(db, p.scheduler),
+            hasActiveEffectWork = { false },
+        )
+        val r = runCatching { h(Settings(null), Settings("13")) }
+        assertTrue(r.exceptionOrNull() is kotlinx.coroutines.CancellationException)
     }
 }
