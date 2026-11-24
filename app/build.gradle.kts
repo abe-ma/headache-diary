@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -8,6 +10,24 @@ plugins {
 
 // applicationId / namespace (確定値)。変更する場合はここと src 配下のパッケージディレクトリ・package 宣言を揃える。
 val appId = "io.github.abe_ma.headachediary"
+val appVersionName = "0.1.0"
+
+// release 署名情報 (Git 管理外)。app/keystore.properties (無ければ rootProject 直下) が存在するときだけ署名する。
+// 無ければ従来どおり署名なしでビルドが通る (CI / 他人のクローン向け)。雛形は keystore.properties.example。
+val keystoreFile = listOf(file("keystore.properties"), rootProject.file("keystore.properties")).firstOrNull { it.isFile }
+val keystoreProps = Properties().apply { keystoreFile?.inputStream()?.use { load(it) } }
+val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+if (keystoreFile != null) {
+    val missing = signingKeys.filter { keystoreProps.getProperty(it).isNullOrBlank() }
+    if (missing.isNotEmpty()) {
+        // 中途半端な設定のまま署名なし APK を作らない。値は出力せず、キー名だけ示す。
+        throw GradleException("keystore.properties に未設定のキーがあります: $missing")
+    }
+}
+val hasReleaseSigning = keystoreFile != null
+
+// 出力名: headache-diary-<versionName>-<buildType>.apk (release 署名付きは headache-diary-0.1.0-release.apk)
+base.archivesName.set("headache-diary-$appVersionName")
 
 android {
     namespace = appId
@@ -20,12 +40,29 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                // "~/" 始まりは home に展開 (例: ~/.android-keys/headache-diary-release.jks)
+                storeFile = file(keystoreProps.getProperty("storeFile").replaceFirst(Regex("^~"), System.getProperty("user.home")))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+                // minSdk 26: v2 以上が有効。v1 は不要 (API 24+ で v2 検証)。AGP が v2/v3 を付与する。
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
