@@ -156,3 +156,32 @@ versionName `0.1.0` / versionCode `1`。
 | app-release.aab | 5,878,818 B | `03aa8f4c4d64eb8a5703963b4795c7dc4153680c6cf9c234a76a2a94ca6478c7` |
 
 未実施: 実機/エミュレータでの起動・操作、release 実行確認、バックアップ復元。
+
+## 署名付き release APK の検証 (HEAD 9d23463)
+検証対象: `git archive 9d23463` を別ディレクトリに展開してビルド (`--no-parallel --max-workers=2`)。署名情報は `-PkeystoreProperties=<絶対パス>` で場所だけ渡し、展開先にはコピーしていない。
+
+### 署名なし (keystore.properties なし) でのビルド
+| タスク | 結果 |
+| --- | --- |
+| assembleRelease (R8) | 成功。出力 `headache-diary-0.1.0-release-unsigned.apk` (署名情報が無くても失敗しない) |
+| testDebugUnitTest | 成功 (249 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3) |
+| assembleDebug / bundleRelease | 成功。`headache-diary-0.1.0-debug.apk` (16,623,020 B, sha256 `0ffa22ceb...ebea`)、bundle は署名なし (5,878,976 B) |
+
+R8 保持ルールの再確認 (seeds / mapping): Worker (名前・`(Context, WorkerParameters)` コンストラクタ)、`OpenMeteoApi.forecast`、`ForecastResponse` / `Hourly` の serializer、`AppDatabase_Impl`、`HeadacheDiaryApp` / `MainActivity` と Hilt の `*_GeneratedInjector` がすべて残っており、追加ルールは不要。
+
+### 署名付き release APK
+`headache-diary-0.1.0-release.apk` (versionName 0.1.0 / versionCode 1)
+
+| 項目 | 結果 |
+| --- | --- |
+| サイズ | 2,602,431 B |
+| sha256 (APK) | `38e257b98be1490bf81b5f59188f472cf7efa99984efde3e4f4e491e41e1bb11` |
+| apksigner verify | `Verifies`。v2: true / v3: true (v1 / v3.1 / v4: false。minSdk 26 は v2 以上で検証される) |
+| 署名者 | 1 名、`CN=abe-ma, C=JP`、RSA 2048 bit |
+| 証明書 SHA-256 | `aae0d2c8a825ab76e71734dcf8e117dff809de7fab6ad97afa73195b07bc7f8e` |
+| zipalign -c -P 16 -v 4 | `Verification successful` |
+
+証明書 SHA-256 は配布元の指紋。以後のリリースで同じ値であることを確認する (違えば鍵が変わっている)。
+
+未実施: 実機/エミュレータでの release APK の起動・操作、バックアップ復元。

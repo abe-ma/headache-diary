@@ -29,7 +29,8 @@ keytool -genkeypair -v -keystore ~/.android-keys/headache-diary-release.jks \
 ```
 ./gradlew --no-parallel --max-workers=2 assembleRelease
 ```
-出力: `app/build/outputs/apk/release/headache-diary-<versionName>-release.apk` (例 `headache-diary-0.1.0-release.apk`)。
+別ディレクトリ (`git archive` の展開物など) でビルドする場合は、`keystore.properties` をコピーせず場所だけ渡せる: `./gradlew -PkeystoreProperties=/絶対パス/keystore.properties assembleRelease`。
+出力: `app/build/outputs/apk/release/headache-diary-<versionName>-release.apk` (署名情報が無い場合は `...-release-unsigned.apk`) (例 `headache-diary-0.1.0-release.apk`)。
 配布時は GitHub Releases のアセット名を `headache-diary-<versionName>.apk` にしてもよい。versionName / versionCode は `app/build.gradle.kts` で更新する (更新インストールには versionCode の増加が必須)。
 
 ### 4. 署名の検証と証明書指紋の控え
