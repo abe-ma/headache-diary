@@ -86,9 +86,13 @@ class RoomAttackRepository(
         val startedMs = attack.startedAt.toEpochMilli()
         // 日時が変わった編集では保存済みの気圧・気圧差は無効 (FR-104, 404)。
         val timeChanged = existing != null && existing.startedAt != startedMs
-        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: pressure.pressureAt(attack.startedAt)
-        // FR-404: 発作時 − 24 時間前。保存値があれば維持し、無ければ解決 (どちらか欠損なら null)。
-        val delta = (if (timeChanged) null else attack.pressureDeltaHpa) ?: PressureDelta.resolve(pressure, attack.startedAt, hpa)
+        val current = pressure.pressureAt(attack.startedAt) // 現在の登録地域の p(t)
+        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: current
+        // FR-404: 保存値があれば維持。無ければ解決するが、保存済みの気圧が現在地域の p(t) と一致するときだけ
+        // (地域変更後に古い発作を編集しても、旧地域の p(t) と新地域の p(t−24h) の差を保存しない。日次補完と共通のガード)。
+        // 日時を変えた保存は hpa が現在地域の値なので、両方が現在地域で再解決される。
+        val delta = (if (timeChanged) null else attack.pressureDeltaHpa)
+            ?: PressureDelta.resolveIfSameRegion(pressure, attack.startedAt, hpa, current)
 
         val id = db.withTransaction {
             val entity = AttackEntity(attack.id, startedMs, attack.severity.name, hpa, delta)

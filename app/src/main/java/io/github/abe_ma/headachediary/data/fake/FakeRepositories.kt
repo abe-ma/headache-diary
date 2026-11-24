@@ -97,10 +97,11 @@ class FakeAttackRepository(
         // 実装 (Room) と同じ: 日時を変えた編集では保存済みの気圧を捨てて再解決する。
         val old = state.value.firstOrNull { it.id == id }
         val timeChanged = old != null && old.startedAt != attack.startedAt
-        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: pressure?.pressureAt(attack.startedAt)
-        // FR-404: 気圧差も同様 (保存値があれば維持、日時変更時は再解決、取れなければ null)。
+        val current = pressure?.pressureAt(attack.startedAt)
+        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: current
+        // FR-404: Room 実装と同じガード (保存済みの気圧が現在地域の p(t) と 0.1 hPa 以内で一致するときだけ差を解決)。
         val delta = (if (timeChanged) null else attack.pressureDeltaHpa)
-            ?: pressure?.let { PressureDelta.resolve(it, attack.startedAt, hpa) }
+            ?: pressure?.let { PressureDelta.resolveIfSameRegion(it, attack.startedAt, hpa, current) }
         val saved = attack.copy(id = id, intakes = intakes, pressureHpa = hpa, pressureDeltaHpa = delta)
         state.update { list -> list.filter { it.id != id } + saved }
         return id

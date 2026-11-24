@@ -285,4 +285,17 @@ class FakeRepositoriesTest {
         r.attacks.save(saved.copy(startedAt = t0.plusSeconds(10 * 3600))) // 日時変更 → 再解決 (データなし → null)
         assertNull(r.attacks.observeAttack(id).first()!!.pressureDeltaHpa)
     }
+
+    @Test
+    fun FR_404_fake_does_not_save_a_mixed_region_delta_when_editing_after_region_change() = runTest {
+        val day = java.time.Duration.ofHours(24)
+        val pressure = io.github.abe_ma.headachediary.data.fake.FakePressureRepository(
+            listOf(PressurePoint(t0, 1000.0), PressurePoint(t0.minus(day), 1011.0)),
+        )
+        val r = FakeRepositories(pressure = pressure)
+        val id = r.attacks.save(Attack(0, t0, Severity.MILD, 1008.0, emptyList())) // 旧地域で保存済みの気圧 1008.0
+        assertNull(r.attacks.observeAttack(id).first()!!.pressureDeltaHpa)
+        r.attacks.save(r.attacks.observeAttack(id).first()!!.copy(severity = Severity.SEVERE))
+        assertNull(r.attacks.observeAttack(id).first()!!.pressureDeltaHpa)
+    }
 }

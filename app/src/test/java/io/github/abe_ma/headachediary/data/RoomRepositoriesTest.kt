@@ -422,4 +422,48 @@ class RoomRepositoriesTest {
         assertEquals(-4.0, dao.observeAttack(same).first()!!.attack.pressureDeltaHpa!!, 1e-9)
         assertNull(dao.observeAttack(noData).first()!!.attack.pressureDeltaHpa)
     }
+
+    @Test
+    fun FR_404_editing_an_old_attack_after_region_change_does_not_save_a_mixed_region_delta() = runBlocking {
+        // 旧地域で保存した 1008.0 (差なし)。地域変更後の現在地域は p(t)=1000.0、p(t−24h)=1011.0。
+        val id = db.attackDao().insertAttack(
+            io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = t0.toEpochMilli(), severity = "MILD", pressureHpa = 1008.0),
+        )
+        pressure.points.value = listOf(PressurePoint(t0, 1000.0), PressurePoint(t0.minus(day), 1011.0))
+        val saved = attacks.observeAttack(id).first()!!
+        attacks.save(saved.copy(severity = Severity.SEVERE)) // 編集して保存 (日時は同じ)
+        val after = attacks.observeAttack(id).first()!!
+        assertEquals(1008.0, after.pressureHpa!!, 0.0) // 気圧は保存済みのまま
+        assertNull(after.pressureDeltaHpa) // 混在した差 (1008−1011) を保存しない
+    }
+
+    @Test
+    fun FR_404_editing_fills_delta_when_stored_pressure_matches_current_region_within_tolerance() = runBlocking {
+        val id = db.attackDao().insertAttack(
+            io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = t0.toEpochMilli(), severity = "MILD", pressureHpa = 1000.1),
+        )
+        pressure.points.value = listOf(PressurePoint(t0, 1000.0), PressurePoint(t0.minus(day), 1011.0))
+        attacks.save(attacks.observeAttack(id).first()!!.copy(severity = Severity.SEVERE))
+        assertEquals(1000.1 - 1011.0, attacks.observeAttack(id).first()!!.pressureDeltaHpa!!, 1e-9)
+    }
+
+    @Test
+    fun FR_404_changing_the_time_re_resolves_both_values_in_the_current_region() = runBlocking {
+        val id = db.attackDao().insertAttack(
+            io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = t0.toEpochMilli(), severity = "MILD", pressureHpa = 1008.0),
+        )
+        val t1 = t0.plusSeconds(86400)
+        pressure.points.value = listOf(PressurePoint(t1, 995.0), PressurePoint(t1.minus(day), 1000.0))
+        attacks.save(attacks.observeAttack(id).first()!!.copy(startedAt = t1))
+        val a = attacks.observeAttack(id).first()!!
+        assertEquals(995.0, a.pressureHpa!!, 0.0) // 旧地域の値は捨てる
+        assertEquals(-5.0, a.pressureDeltaHpa!!, 1e-9)
+    }
+
+    @Test
+    fun FR_404_new_attack_with_explicit_pressure_that_mismatches_current_region_gets_no_delta() = runBlocking {
+        pressure.points.value = listOf(PressurePoint(t0, 1000.0), PressurePoint(t0.minus(day), 1011.0))
+        val id = attacks.save(Attack(0, t0, Severity.MILD, 1008.0, emptyList()))
+        assertNull(attacks.observeAttack(id).first()!!.pressureDeltaHpa)
+    }
 }
