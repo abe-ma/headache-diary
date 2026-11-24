@@ -258,7 +258,7 @@ class RoomRepositoriesTest {
 
     @Test
     fun FR_203_preset_rename_is_synced_on_open_keeping_id_hidden_and_records() = runBlocking {
-        val naproxen = med("ナプロキセン（ナイキサン）")
+        val naproxen = med("ナイキサン")
         assertEquals(7L, naproxen.id)
         assertEquals("ナプロキセン", naproxen.ingredient)
         // 旧バージョンの DB を模擬: 旧名に戻し、非表示 + 記録あり + 自由入力あり
@@ -266,28 +266,28 @@ class RoomRepositoriesTest {
         val id = attacks.save(attack(t0, naproxen))
         meds.setHidden(naproxen.id, true)
         val w = db.openHelper.writableDatabase
-        w.execSQL("UPDATE medication SET name = 'ナイキサン', ingredient = '旧成分' WHERE id = 7")
+        w.execSQL("UPDATE medication SET name = 'ナプロキセン（ナイキサン）', ingredient = '旧成分' WHERE id = 7") // 旧表記 (T-03b 追記2) の端末を模擬
         w.execSQL("UPDATE medication SET ingredient = '改変' WHERE id = ?", arrayOf<Any?>(custom.id))
         PresetSeedCallback.onOpen(w)
         val after = meds.observeAll().first()
         val p = after.first { it.id == 7L }
-        assertEquals("ナプロキセン（ナイキサン）", p.name)
+        assertEquals("ナイキサン", p.name)
         assertEquals("ナプロキセン", p.ingredient)
         assertTrue(p.isHidden) // 非表示は維持
         assertEquals(PRESET_MEDICATIONS.size + 1, after.size)
         assertEquals("改変", after.first { it.id == custom.id }.ingredient) // 自由入力は対象外
         val rec = attacks.observeAttack(id).first()!!.intakes.single().medication
         assertEquals(7L, rec.id) // 記録の medicationId は不変
-        assertEquals("ナプロキセン（ナイキサン）", rec.name)
+        assertEquals("ナイキサン", rec.name)
     }
 
     @Test
     fun FR_203_preset_rename_skipped_if_custom_has_same_name_without_crash() = runBlocking {
         val w = db.openHelper.writableDatabase
-        w.execSQL("UPDATE medication SET name = 'ナイキサン' WHERE id = 7")
-        meds.addCustom("ナプロキセン（ナイキサン）") // 新名を自由入力が先に占有
+        w.execSQL("UPDATE medication SET name = 'ナプロキセン（ナイキサン）' WHERE id = 7")
+        meds.addCustom("ナイキサン") // 新名を自由入力が先に占有
         PresetSeedCallback.onOpen(w) // 例外にならない
-        assertEquals("ナイキサン", meds.observeAll().first().first { it.id == 7L }.name)
+        assertEquals("ナプロキセン（ナイキサン）", meds.observeAll().first().first { it.id == 7L }.name)
     }
 
     @Test

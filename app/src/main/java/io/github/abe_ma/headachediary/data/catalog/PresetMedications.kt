@@ -18,7 +18,7 @@ val PRESET_MEDICATIONS: List<PresetMedication> = listOf(
     PresetMedication("EVE", "イブプロフェン (シリーズにより成分が異なる)"),
     PresetMedication("バファリン", "シリーズにより成分が異なる"),
     PresetMedication("ロキソニン", "ロキソプロフェンナトリウム水和物"),
-    PresetMedication("ナプロキセン（ナイキサン）", "ナプロキセン"),
+    PresetMedication("ナイキサン", "ナプロキセン"),
     PresetMedication("マクサルト", "リザトリプタン安息香酸塩"),
     PresetMedication("イミグラン", "スマトリプタンコハク酸塩"),
     PresetMedication("ゾーミッグ", "ゾルミトリプタン"),
