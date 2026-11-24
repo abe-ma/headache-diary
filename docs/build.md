@@ -139,3 +139,20 @@ versionName `0.1.0` / versionCode `1`。
 | app-release.aab | 5,868,051 B | `41f5de05f3d1298e8ec98fccc061b5757578825a493c5423954ecca01f6bf670` |
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
+
+## リリース前確認 (HEAD 38d5746)
+検証対象: `git archive 38d5746` を別ディレクトリに展開してビルド (作業ツリーの未コミット編集は含まない)。`./gradlew --no-parallel --max-workers=2` で 1 タスクずつ実行。versionName `0.1.0` / versionCode `1`。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (244 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3) |
+| assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
+
+| 成果物 | サイズ | sha256 |
+| --- | --- | --- |
+| app-debug.apk | 16,606,636 B | `c8783308038f468c466a32929df7b3505636b5a731a349ef58c6cd02bb85926e` |
+| app-release-unsigned.apk | 2,590,143 B | `a7d286af5687cf64a05f8d4b715ca27c082c94434647e3a7134d47dfc5497c45` |
+| app-release.aab | 5,878,818 B | `03aa8f4c4d64eb8a5703963b4795c7dc4153680c6cf9c234a76a2a94ca6478c7` |
+
+未実施: 実機/エミュレータでの起動・操作、release 実行確認、バックアップ復元。
