@@ -6,6 +6,7 @@
     <string name="export_csv_severity">痛みの強さ</string>
     <string name="export_csv_medication">服薬</string>
     <string name="export_csv_pressure">記録時の気圧(hPa)</string>
+    <string name="export_csv_pressure_delta">前日との気圧差(hPa)</string>
 
     <!-- 痛みの強さ / 薬の効果 (CSV・PDF 共通。UI の文言と揃えること) -->
     <string name="export_severity_mild">軽い</string>
@@ -39,5 +40,6 @@
     <string name="export_pdf_col_severity">強さ</string>
     <string name="export_pdf_col_medication">服薬(薬名×錠数・効果)</string>
     <string name="export_pdf_col_pressure">気圧(hPa)</string>
+    <string name="export_pdf_col_pressure_delta">前日差(hPa)</string>
     <string name="export_pdf_count_suffix">回</string>
 </resources>

@@ -14,6 +14,7 @@ data class AttackEntity(
     val startedAt: Long, // UTC epoch ms
     val severity: String, // Severity.name
     val pressureHpa: Double?,
+    val pressureDeltaHpa: Double? = null, // FR-404 (v3): 発作時 − 24時間前の気圧差
 )
 
 @Entity(

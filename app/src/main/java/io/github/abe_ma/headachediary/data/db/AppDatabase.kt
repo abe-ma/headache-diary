@@ -10,7 +10,7 @@ import io.github.abe_ma.headachediary.data.catalog.PRESET_MEDICATIONS
 
 @Database(
     entities = [AttackEntity::class, IntakeEntity::class, MedicationEntity::class, PressureHourEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,7 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
         /** DB ファイル名。バックアップ設定 (docs/data-layer.md) と対応するため変更しないこと。 */
         const val NAME = "headache_diary.db"
 
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         /** 実機用。 */
         fun create(context: Context): AppDatabase =
@@ -48,6 +48,13 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE medication ADD COLUMN unit TEXT NOT NULL DEFAULT 'TABLET'")
         db.execSQL("UPDATE medication SET unit = 'PACKET' WHERE isPreset = 1 AND id BETWEEN 16 AND 22")
+    }
+}
+
+/** v2 → v3 (FR-404): attack.pressureDeltaHpa を追加 (NULL 許容)。既存の行はそのまま、値は日次補完ジョブが後から埋める。 */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE attack ADD COLUMN pressureDeltaHpa REAL")
     }
 }
 

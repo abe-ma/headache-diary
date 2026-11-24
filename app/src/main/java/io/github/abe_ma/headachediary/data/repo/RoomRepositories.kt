@@ -39,6 +39,7 @@ internal fun AttackWithIntakes.toDomain() = Attack(
     intakes = intakes.sortedBy { it.intake.id }.map {
         Intake(it.intake.id, it.medication.toDomain(), it.intake.tablets, Effect.valueOf(it.intake.effect))
     },
+    pressureDeltaHpa = attack.pressureDeltaHpa,
 )
 
 class RoomMedicationRepository(private val db: AppDatabase) : MedicationRepository {
@@ -83,12 +84,14 @@ class RoomAttackRepository(
         require(attack.intakes.all { it.tablets >= 1 }) { "錠数は1以上" }
         val existing = if (attack.id != 0L) dao.getAttack(attack.id) else null
         val startedMs = attack.startedAt.toEpochMilli()
-        // 日時が変わった編集では保存済みの気圧は無効 (FR-104)。
-        val keep = if (existing != null && existing.startedAt != startedMs) null else attack.pressureHpa
-        val hpa = keep ?: pressure.pressureAt(attack.startedAt)
+        // 日時が変わった編集では保存済みの気圧・気圧差は無効 (FR-104, 404)。
+        val timeChanged = existing != null && existing.startedAt != startedMs
+        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: pressure.pressureAt(attack.startedAt)
+        // FR-404: 発作時 − 24 時間前。保存値があれば維持し、無ければ解決 (どちらか欠損なら null)。
+        val delta = (if (timeChanged) null else attack.pressureDeltaHpa) ?: PressureDelta.resolve(pressure, attack.startedAt, hpa)
 
         val id = db.withTransaction {
-            val entity = AttackEntity(attack.id, startedMs, attack.severity.name, hpa)
+            val entity = AttackEntity(attack.id, startedMs, attack.severity.name, hpa, delta)
             val id = if (existing == null) dao.insertAttack(entity) else { dao.updateAttack(entity); attack.id }
             val keptIds = attack.intakes.map { it.id }.filter { it != 0L }.toSet()
             val stale = dao.intakeIds(id).filter { it !in keptIds }

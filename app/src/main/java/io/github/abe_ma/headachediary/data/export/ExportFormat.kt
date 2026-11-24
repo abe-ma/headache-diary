@@ -35,6 +35,16 @@ internal val DATETIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy
 
 internal fun formatHpa(v: Double?): String = v?.let { String.format(Locale.ROOT, "%.1f", it) } ?: ""
 
+/**
+ * 前日との気圧差 (FR-404): 符号付き小数 1 桁 (+1.2 / -3.4 / 0.0)。四捨五入して 0.0 になる値は符号なし。欠損は [missing]。
+ * 数式対策の ' 前置は文字列列 (薬名) のみで、この数値列には付けない。
+ */
+internal fun formatDelta(v: Double?, missing: String): String {
+    if (v == null) return missing
+    val r = Math.round(v * 10) / 10.0
+    return if (r == 0.0) "0.0" else String.format(Locale.ROOT, "%+.1f", r)
+}
+
 /** 「薬名×2錠 (効果)」(FR-209: 単位つき)。薬名はそのまま (数式対策は CSV 側)。 */
 internal fun intakeText(name: String, count: Int, unit: String, effect: String) = "$name×$count$unit ($effect)"
 
@@ -56,6 +66,7 @@ object CsvExport {
         row(
             labels.s(R.string.export_csv_datetime), labels.s(R.string.export_csv_severity),
             labels.s(R.string.export_csv_medication), labels.s(R.string.export_csv_pressure),
+            labels.s(R.string.export_csv_pressure_delta),
         )
         for (a in attacksOldestFirst) {
             row(
@@ -65,6 +76,7 @@ object CsvExport {
                     intakeText(guardFormula(it.medication.name), it.tablets, labels.unit(it.medication.unit), labels.effect(it.effect))
                 },
                 formatHpa(a.pressureHpa),
+                formatDelta(a.pressureDeltaHpa, missing = ""),
             )
         }
         // FR-403: 気圧が 1 件でもあれば帰属行 (CC BY 4.0)。全て欠損なら付けない。

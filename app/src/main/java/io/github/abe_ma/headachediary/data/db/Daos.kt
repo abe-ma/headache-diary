@@ -24,16 +24,19 @@ interface AttackDao {
     @Query("SELECT startedAt FROM attack WHERE startedAt >= :from")
     fun observeStartedAtSince(from: Long): Flow<List<Long>>
 
-    /** T-05 の補完用: 気圧が欠損している、指定時刻以降の発作。 */
-    @Query("SELECT * FROM attack WHERE pressureHpa IS NULL AND startedAt >= :since")
+    /** 日次補完用: 気圧、または前日との気圧差 (FR-404) が欠損している、指定時刻以降の発作。 */
+    @Query("SELECT * FROM attack WHERE (pressureHpa IS NULL OR pressureDeltaHpa IS NULL) AND startedAt >= :since")
     suspend fun getMissingPressureSince(since: Long): List<AttackEntity>
+
+    /** 欠損している列だけを埋める (既存値は上書きしない)。 */
+    @Query(
+        "UPDATE attack SET pressureHpa = COALESCE(pressureHpa, :hpa), pressureDeltaHpa = COALESCE(pressureDeltaHpa, :delta) WHERE id = :id",
+    )
+    suspend fun fillPressure(id: Long, hpa: Double?, delta: Double?)
 
     /** 効果が未評価の服薬を持つ、指定時刻以降の発作 (起動時のリマインダー復元用)。 */
     @Query("SELECT DISTINCT a.* FROM attack a JOIN intake i ON i.attackId = a.id WHERE i.effect = 'UNRATED' AND a.startedAt >= :since")
     suspend fun getUnratedSince(since: Long): List<AttackEntity>
-
-    @Query("UPDATE attack SET pressureHpa = :hpa WHERE id = :id AND pressureHpa IS NULL")
-    suspend fun fillPressure(id: Long, hpa: Double)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAttack(a: AttackEntity): Long
     @Update suspend fun updateAttack(a: AttackEntity)

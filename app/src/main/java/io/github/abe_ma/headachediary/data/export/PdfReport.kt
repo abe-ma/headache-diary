@@ -238,7 +238,8 @@ class PdfReport(
     private val colDate = margin
     private val colSev = margin + 92f
     private val colMed = margin + 150f
-    private val colHpa = margin + contentW - 52f
+    private val colDelta = margin + contentW - 56f // 前日差 (FR-404)
+    private val colHpa = colDelta - 56f
     private val medW = colHpa - colMed - 6f
 
     private fun tableHeaderBlock() = Block(18f) { c, top ->
@@ -247,6 +248,7 @@ class PdfReport(
         c.drawText(labels.s(R.string.export_pdf_col_severity), colSev, top + 12f, p)
         c.drawText(labels.s(R.string.export_pdf_col_medication), colMed, top + 12f, p)
         c.drawText(labels.s(R.string.export_pdf_col_pressure), colHpa, top + 12f, p)
+        c.drawText(labels.s(R.string.export_pdf_col_pressure_delta), colDelta, top + 12f, p)
         c.drawLine(margin, top + 16f, margin + contentW, top + 16f, grid)
     }
 
@@ -260,6 +262,7 @@ class PdfReport(
             c.drawText(labels.severity(a.severity), colSev, base, body)
             medLines.forEachIndexed { i, l -> c.drawText(l, colMed, base + i * lh, body) }
             c.drawText(formatHpa(a.pressureHpa), colHpa, base, body)
+            c.drawText(formatDelta(a.pressureDeltaHpa, missing = "-"), colDelta, base, body)
             c.drawLine(margin, top + n * lh + 3f, margin + contentW, top + n * lh + 3f, grid)
         }
     }

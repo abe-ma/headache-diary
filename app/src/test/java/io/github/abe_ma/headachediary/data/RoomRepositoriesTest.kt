@@ -314,4 +314,67 @@ class RoomRepositoriesTest {
     fun FR_209_custom_medication_is_tablet() = runBlocking {
         assertEquals(io.github.abe_ma.headachediary.domain.MedicationUnit.TABLET, meds.addCustom("自由薬").unit)
     }
+
+    private val day = java.time.Duration.ofHours(24)
+
+    @Test
+    fun FR_404_save_resolves_delta_as_p_t_minus_p_24h_before_within_one_hour() = runBlocking {
+        pressure.points.value = listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day).plusSeconds(1800), 1012.0))
+        val id = attacks.save(attack(t0))
+        val a = attacks.observeAttack(id).first()!!
+        assertEquals(1008.0, a.pressureHpa!!, 0.0)
+        assertEquals(-4.0, a.pressureDeltaHpa!!, 1e-9) // 24h前 ±1h 以内の最寄り (30分ずれ) を使う
+        // 境界: ちょうど 1 時間ずれは取れる、1 秒超えると取れない
+        pressure.points.value = listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day).minusSeconds(3600), 1010.0))
+        val b = attacks.save(attack(t0))
+        assertEquals(1008.0 - 1010.0, attacks.observeAttack(b).first()!!.pressureDeltaHpa!!, 1e-9)
+        pressure.points.value = listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day).minusSeconds(3602), 1010.0))
+        val c = attacks.save(attack(t0))
+        assertNull(attacks.observeAttack(c).first()!!.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_delta_is_null_when_either_pressure_is_missing() = runBlocking {
+        pressure.points.value = listOf(PressurePoint(t0.minus(day), 1010.0)) // 発作時の気圧なし
+        assertNull(attacks.observeAttack(attacks.save(attack(t0))).first()!!.pressureDeltaHpa)
+        pressure.points.value = listOf(PressurePoint(t0, 1008.0)) // 24h前なし
+        assertNull(attacks.observeAttack(attacks.save(attack(t0))).first()!!.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_edit_keeps_stored_delta_and_time_change_recomputes() = runBlocking {
+        pressure.points.value = listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day), 1010.0))
+        val id = attacks.save(attack(t0))
+        val saved = attacks.observeAttack(id).first()!!
+        pressure.points.value = emptyList()
+        attacks.save(saved.copy(severity = Severity.MILD))
+        assertEquals(-2.0, attacks.observeAttack(id).first()!!.pressureDeltaHpa!!, 1e-9) // 書き出し時などに再計算しない
+        attacks.save(saved.copy(startedAt = t0.plusSeconds(86400)))
+        assertNull(attacks.observeAttack(id).first()!!.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_backfill_fills_delta_when_day_before_data_arrives_later_without_overwriting() = runBlocking {
+        val dao = db.attackDao()
+        val base = Instant.parse("2026-11-22T00:00:00Z")
+        // A: 気圧あり・差なし (後から 24h 前が取れた)、B: 気圧も差もなし、C: 両方あり (上書きしない)、D: 31日より古い
+        val a = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.toEpochMilli(), severity = "MILD", pressureHpa = 1008.0))
+        val b = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.plusSeconds(3600).toEpochMilli(), severity = "MILD", pressureHpa = null))
+        val c = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.toEpochMilli(), severity = "MILD", pressureHpa = 999.0, pressureDeltaHpa = 5.0))
+        val d = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.minus(java.time.Duration.ofDays(40)).toEpochMilli(), severity = "MILD", pressureHpa = null))
+        pressure.points.value = listOf(
+            PressurePoint(base.minus(day), 1011.0), PressurePoint(base, 1000.0), PressurePoint(base.plusSeconds(3600), 1002.0),
+            PressurePoint(base.plusSeconds(3600).minus(day), 1005.0),
+        )
+        pressure.lastFetched.value = now
+        val job = io.github.abe_ma.headachediary.data.work.PressureRefreshJob(pressure, db) { Instant.parse("2026-11-23T00:00:00Z") }
+        job.run()
+        suspend fun get(id: Long) = dao.observeAttack(id).first()!!.attack
+        assertEquals(1008.0, get(a).pressureHpa!!, 0.0) // 既存の気圧は維持
+        assertEquals(1008.0 - 1011.0, get(a).pressureDeltaHpa!!, 1e-9)
+        assertEquals(1002.0, get(b).pressureHpa!!, 0.0)
+        assertEquals(1002.0 - 1005.0, get(b).pressureDeltaHpa!!, 1e-9)
+        assertEquals(999.0, get(c).pressureHpa!!, 0.0); assertEquals(5.0, get(c).pressureDeltaHpa!!, 0.0) // 上書きしない
+        assertNull(get(d).pressureHpa); assertNull(get(d).pressureDeltaHpa) // 31 日より前は対象外
+    }
 }

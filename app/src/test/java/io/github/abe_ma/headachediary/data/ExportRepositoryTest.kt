@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import io.github.abe_ma.headachediary.data.db.AppDatabase
 import io.github.abe_ma.headachediary.data.export.FileExportRepository
+import io.github.abe_ma.headachediary.data.export.formatDelta
 import io.github.abe_ma.headachediary.data.export.PdfOutput
 import io.github.abe_ma.headachediary.data.fake.FakePressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
@@ -106,9 +107,9 @@ class ExportRepositoryTest {
         assertEquals(listOf(0xEF, 0xBB, 0xBF), b.take(3).map { it.toInt() and 0xFF })
         val text = String(b, Charsets.UTF_8).removePrefix("\uFEFF")
         val lines = text.split("\r\n")
-        assertEquals("発作日時,痛みの強さ,服薬,記録時の気圧(hPa)", lines[0])
-        assertEquals("2026-11-20 12:05,軽い,,", lines[1]) // 古い順・服薬なし・気圧欠損は空
-        assertEquals("2026-11-21 12:05,強い,ロキソニン×2錠 (効いた) / カロナール×1錠 (未評価),1004.3", lines[2])
+        assertEquals("発作日時,痛みの強さ,服薬,記録時の気圧(hPa),前日との気圧差(hPa)", lines[0])
+        assertEquals("2026-11-20 12:05,軽い,,,", lines[1]) // 古い順・服薬なし・気圧欠損は空
+        assertEquals("2026-11-21 12:05,強い,ロキソニン×2錠 (効いた) / カロナール×1錠 (未評価),1004.3,", lines[2])
         assertEquals("# 気圧データ: Weather data by Open-Meteo.com (https://open-meteo.com/)", lines[3]) // FR-403
         assertEquals("", lines[4])
         assertFalse(text.replace("\r\n", "").contains("\n"))
@@ -141,7 +142,7 @@ class ExportRepositoryTest {
     fun FR_400_csv_empty_range_returns_header_only() = runBlocking {
         save(t0, Severity.MILD, null)
         val text = String(bytes(export.exportCsv(t0.plusSeconds(86400)..t0.plusSeconds(2 * 86400))), Charsets.UTF_8)
-        assertEquals("\uFEFF発作日時,痛みの強さ,服薬,記録時の気圧(hPa)\r\n", text)
+        assertEquals("\uFEFF発作日時,痛みの強さ,服薬,記録時の気圧(hPa),前日との気圧差(hPa)\r\n", text)
     }
 
     @Test
@@ -223,5 +224,48 @@ class ExportRepositoryTest {
         val r = runCatching { failing.exportPdf(all) }
         assertTrue(r.isFailure)
         assertEquals(emptyList<String>(), dir.list()!!.toList()) // 最終名も .tmp も残らない
+    }
+
+    private suspend fun saveWithDelta(at: Instant, hpa: Double?, delta: Double?, med: String = "ロキソニン") {
+        val m = meds.observeAll().first().first { it.name == med }
+        attacks.save(Attack(0, at, Severity.MILD, hpa, listOf(Intake(0, m, 1, Effect.UNRATED)), pressureDeltaHpa = delta))
+    }
+
+    @Test
+    fun FR_404_csv_delta_column_is_signed_one_decimal_blank_when_missing_and_never_formula_guarded() = runBlocking {
+        saveWithDelta(t0, 1008.0, 1.2)
+        saveWithDelta(t0.plusSeconds(3600), 1000.0, -3.44)
+        saveWithDelta(t0.plusSeconds(7200), 1000.0, 0.0)
+        saveWithDelta(t0.plusSeconds(10800), 1000.0, -0.04) // 丸めると 0.0 → 符号なし
+        saveWithDelta(t0.plusSeconds(14400), 1000.0, null)
+        val rows = String(bytes(export.exportCsv(all)), Charsets.UTF_8).removePrefix("\uFEFF").split("\r\n").drop(1)
+        assertTrue(rows[0].endsWith(",1008.0,+1.2"))
+        assertTrue(rows[1].endsWith(",1000.0,-3.4"))
+        assertTrue(rows[2].endsWith(",1000.0,0.0"))
+        assertTrue(rows[3].endsWith(",1000.0,0.0"))
+        assertTrue(rows[4].endsWith(",1000.0,")) // 欠損は空欄
+        assertFalse(rows.any { it.contains("'+1.2") || it.contains("'-3.4") }) // 数値列に ' を付けない
+    }
+
+    @Test
+    fun FR_404_csv_delta_is_blank_but_pressure_attribution_rule_is_unchanged() = runBlocking {
+        saveWithDelta(t0, null, null)
+        val text = String(bytes(export.exportCsv(all)), Charsets.UTF_8)
+        assertFalse(text.contains("Open-Meteo")) // 気圧が全て欠損 → 帰属行なし
+        assertTrue(text.contains("軽い,ロキソニン×1錠 (未評価),,"))
+    }
+
+    @Test
+    fun FR_404_format_delta_rounding_and_signs() {
+        fun f(v: Double?, m: String = "") = formatDelta(v, m)
+        assertEquals("+0.1", f(0.06)); assertEquals("-0.1", f(-0.06)); assertEquals("0.0", f(0.049)); assertEquals("-", f(null, "-"))
+        assertEquals("+10.0", f(10.0)); assertEquals("-12.3", f(-12.34))
+    }
+
+    @Test
+    fun FR_404_pdf_with_delta_column_generates_and_keeps_pagination() = runBlocking {
+        repeat(60) { saveWithDelta(t0.plusSeconds(it * 3600L), 1000.0, if (it % 3 == 0) null else (it - 30) / 10.0) }
+        export.exportPdf(all)
+        assertTrue("pages=${export.lastPdfPageCount}", export.lastPdfPageCount >= 2)
     }
 }

@@ -16,6 +16,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import io.github.abe_ma.headachediary.data.db.AppDatabase
+import io.github.abe_ma.headachediary.data.repo.PressureDelta
 import io.github.abe_ma.headachediary.domain.FailureReason
 import io.github.abe_ma.headachediary.domain.PressureRepository
 import io.github.abe_ma.headachediary.domain.RefreshResult
@@ -44,8 +45,12 @@ class PressureRefreshJob(
     private suspend fun backfill() {
         val dao = db.attackDao()
         val since = now().minus(Duration.ofDays(BACKFILL_DAYS)).toEpochMilli()
+        // 気圧が欠損、または前日との気圧差 (FR-404) が欠損している直近の発作を、取れるようになった分だけ埋める。
         dao.getMissingPressureSince(since).forEach { a ->
-            pressure.pressureAt(Instant.ofEpochMilli(a.startedAt))?.let { dao.fillPressure(a.id, it) }
+            val t = Instant.ofEpochMilli(a.startedAt)
+            val hpa = a.pressureHpa ?: pressure.pressureAt(t)
+            val delta = if (a.pressureDeltaHpa == null) PressureDelta.resolve(pressure, t, hpa) else null
+            if (hpa != a.pressureHpa || delta != null) dao.fillPressure(a.id, hpa, delta)
         }
     }
 
