@@ -18,6 +18,7 @@ data class Attack(                                              // FR-200,201
     val startedAt: Instant,
     val severity: Severity,
     val pressureHpa: Double?,        // FR-104: 保存時の紐づけ。欠損可
+    val pressureDeltaHpa: Double? = null, // FR-404: 発作時 − 24時間前の気圧差 (hPa、マイナス=低下)。欠損可。UI は null を渡せば Repository が解決する
     val intakes: List<Intake>,
 )
 data class Intake(                                              // FR-203,204,205
@@ -48,7 +49,7 @@ data class Settings(
 ```
 
 ### Room テーブル
-- `attack(id PK, startedAt, severity, pressureHpa NULL)`
+- `attack(id PK, startedAt, severity, pressureHpa NULL, pressureDeltaHpa NULL)` (Room v3 / MIGRATION_2_3 で列追加。既存行は NULL)
 - `intake(id PK, attackId FK→attack ON DELETE CASCADE, medicationId FK, tablets, effect)`
 - `medication(id PK, name, ingredient NULL, isPreset, isHidden DEFAULT 0, unit DEFAULT 'TABLET')` (Room v2 / MIGRATION_1_2。プリセットは起動時に id で name/ingredient/unit を同期) — プリセットは初回起動時 (または DB 初期化時) に投入。プリセットの定義は `data` 内の静的リソース (01-requirements の一覧)。
 - `pressure_hour(prefectureCode, time, hpa, PK(prefectureCode, time))` — 地域変更後も過去地域のデータは残す (削除しない)。
