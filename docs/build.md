@@ -105,3 +105,20 @@ versionName `0.1.0` / versionCode `1`。
 | app-release.aab | 5,796,454 B | `95c6e9839235a843d65cc49b043d41b69638c89c8b61377a4d5ecd1ac75e3cf2` |
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。旧 88a0737 版 APK は `shared/artifacts/` に残してある。
+
+## 最終確認 T-15c (HEAD 046d7d1 / T-17 ナイキサン表記 + T-18 ランチャーアイコン)
+検証対象: **`git archive 046d7d1` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2`、versionName `0.1.0` / versionCode `1` のまま。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。Monochrome が 1 件増えたのは T-18 のアイコン差し替えによる。T-18b の前景差し替え後に再確認) |
+| assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
+
+| 成果物 | サイズ | sha256 |
+| --- | --- | --- |
+| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-046d7d1-debug.apk`) | 16,629,680 B | `901c4c39912e203abd102e35d80b01d22ddbd8df5a94b264c971c3bac0afd1f9` |
+| app-release-unsigned.apk | 2,590,791 B | `11d6e7bd29b71134cb5c68324aee8f1e07094f2100e682f328f55847f8b78db9` |
+| app-release.aab | 5,890,853 B | `d1a50f214adf222400d569e0a94f985131c2b602df6fa12a433982ae4d08c15c` |
+
+未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
