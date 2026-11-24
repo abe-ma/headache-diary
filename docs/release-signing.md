@@ -22,6 +22,7 @@ keytool -genkeypair -v -keystore ~/.android-keys/headache-diary-release.jks \
 ### 2. 署名設定
 - `app/keystore.properties.example` を `app/keystore.properties` にコピーし、storeFile / storePassword / keyAlias / keyPassword を実際の値にする。
   `storeFile` は絶対パスか `~/` 始まり。`keystore.properties` と `*.jks` は `.gitignore` 済み。
+  パスワードは平文で書かれるため、ファイルの権限を自分だけに絞る (`chmod 600 app/keystore.properties`)。値をシェルの履歴に残さず作るには、`read -s -p "password: " P` で入力して `printf` でファイルに書き出す。`storeFile` の `~/` 展開は Linux/macOS のみ (Windows では絶対パスを使う)。
 - v2 / v3 署名は AGP が付与する (minSdk 26 で v2 以上が有効。v1 は無効)。zipalign も AGP が自動で行う。
 
 ### 3. ビルド
