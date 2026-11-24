@@ -9,6 +9,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 
 @StringRes
 fun Severity.labelRes(): Int = when (this) {
@@ -45,3 +46,28 @@ fun formatListDateTime(at: Instant, zone: ZoneId, now: Instant): String {
 
 fun formatDate(at: Instant, zone: ZoneId): String = dateWithYear.format(at.atZone(zone))
 fun formatTime(at: Instant, zone: ZoneId): String = timeOnly.format(at.atZone(zone))
+
+/** 気圧 (hPa) を小数1桁で。 */
+fun formatPressure(hpa: Double): String = String.format(Locale.JAPAN, "%.1f", hpa)
+
+/**
+ * FR-404: 前日との気圧差を符号付き小数1桁で (例: `+1.2` / `-3.4` / `0.0`)。
+ * 小数1桁に丸めて 0.0 になるものは符号なしの `0.0` にする (`-0.0` と出さない)。
+ */
+fun formatPressureDelta(deltaHpa: Double): String {
+    val rounded = String.format(Locale.JAPAN, "%.1f", abs(deltaHpa))
+    if (rounded == "0.0") return "0.0"
+    return (if (deltaHpa < 0) "-" else "+") + rounded
+}
+
+/** 読み上げ用の前日差の向き。丸めて 0.0 なら「同じ」。 */
+enum class DeltaDirection { LOWER, HIGHER, SAME }
+
+fun pressureDeltaDirection(deltaHpa: Double): DeltaDirection = when {
+    formatPressureDelta(deltaHpa) == "0.0" -> DeltaDirection.SAME
+    deltaHpa < 0 -> DeltaDirection.LOWER
+    else -> DeltaDirection.HIGHER
+}
+
+/** 差の大きさ (符号なし、小数1桁)。 */
+fun formatPressureDeltaMagnitude(deltaHpa: Double): String = String.format(Locale.JAPAN, "%.1f", abs(deltaHpa))

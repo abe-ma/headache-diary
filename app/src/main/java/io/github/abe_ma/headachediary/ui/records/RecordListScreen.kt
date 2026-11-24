@@ -35,7 +35,12 @@ import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.MedicationUnit
+import io.github.abe_ma.headachediary.ui.DeltaDirection
 import io.github.abe_ma.headachediary.ui.formatListDateTime
+import io.github.abe_ma.headachediary.ui.formatPressure
+import io.github.abe_ma.headachediary.ui.formatPressureDelta
+import io.github.abe_ma.headachediary.ui.formatPressureDeltaMagnitude
+import io.github.abe_ma.headachediary.ui.pressureDeltaDirection
 import io.github.abe_ma.headachediary.ui.labelRes
 import java.time.Instant
 import java.time.ZoneId
@@ -44,6 +49,7 @@ import java.util.Locale
 const val TAG_ADD_ATTACK = "add_attack"
 const val TAG_RECORD_EMPTY = "record_empty"
 fun recordItemTag(id: Long) = "record_item_$id"
+fun recordPressureTag(id: Long) = "record_pressure_$id"
 
 @Composable
 fun RecordListScreen(
@@ -128,14 +134,27 @@ private fun AttackRow(attack: Attack, zone: ZoneId, now: Instant, onClick: () ->
         attack.intakes.joinToString(sep) { intakeFormat.format(it.medication.name, it.tablets, if (it.medication.unit == MedicationUnit.PACKET) packetUnit else tabletUnit) }
     }
     val pending = attack.intakes.any { it.effect == Effect.UNRATED }
-    val pressureText = attack.pressureHpa?.let {
-        stringResource(R.string.record_list_pressure, String.format(Locale.JAPAN, "%.1f", it))
+    // FR-404: 「気圧 1013.2 hPa (前日差 -3.4)」。前日差が無ければ括弧を省き、気圧も無ければ何も出さない。
+    val pressureLine = attack.pressureHpa?.let { hpa ->
+        attack.pressureDeltaHpa?.let { delta ->
+            stringResource(R.string.record_list_pressure_with_delta, formatPressure(hpa), formatPressureDelta(delta))
+        } ?: stringResource(R.string.record_list_pressure, formatPressure(hpa))
     }
+    // 読み上げは記号 (+/-) に頼らず「前日より 3.4 hPa 低い」と言葉で。助言は含めない。
+    val deltaSpoken = attack.pressureHpa?.let { attack.pressureDeltaHpa }?.let { delta ->
+        when (pressureDeltaDirection(delta)) {
+            DeltaDirection.LOWER -> stringResource(R.string.record_a11y_delta_lower, formatPressureDeltaMagnitude(delta))
+            DeltaDirection.HIGHER -> stringResource(R.string.record_a11y_delta_higher, formatPressureDeltaMagnitude(delta))
+            DeltaDirection.SAME -> stringResource(R.string.record_a11y_delta_same)
+        }
+    }
+    val pressureSpoken = attack.pressureHpa?.let { stringResource(R.string.record_list_pressure, formatPressure(it)) }
     val pendingText = stringResource(R.string.record_item_description_effect_pending)
     val description = listOfNotNull(
         stringResource(R.string.record_item_description, whenText, severityText, medsText),
         pendingText.takeIf { pending },
-        pressureText,
+        pressureSpoken,
+        deltaSpoken,
     ).joinToString("、")
 
     Surface(
@@ -162,11 +181,12 @@ private fun AttackRow(attack: Attack, zone: ZoneId, now: Instant, onClick: () ->
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            attack.pressureHpa?.let {
+            if (pressureLine != null) {
                 Text(
-                    stringResource(R.string.record_list_pressure, String.format(Locale.JAPAN, "%.1f", it)),
+                    pressureLine,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(recordPressureTag(attack.id)),
                 )
             }
         }

@@ -353,4 +353,59 @@ class AttackEditViewModelTest {
         val restored = AttackEditViewModel(FakeRepositories().attacks, FakeRepositories().settings, store, handle).uiState.value
         assertNull(restored.severity)
     }
+
+    @Test
+    fun FR404_既存記録を開くと保存済みの気圧と前日差を読み取り専用で持つ() = runTest {
+        val fakes = FakeRepositories()
+        val t = Instant.parse("2026-11-01T00:00:00Z")
+        val id = fakes.attacks.save(Attack(0, t, Severity.MILD, 1005.0, emptyList(), pressureDeltaHpa = -3.4))
+        val s = vm(fakes, id).uiState.value
+        assertEquals(1005.0, s.savedPressureHpa!!, 0.0)
+        assertEquals(-3.4, s.savedPressureDeltaHpa!!, 0.0)
+        assertFalse(s.isPressureStale)
+    }
+
+    @Test
+    fun FR404_新規作成では保存済みの気圧を持たない() {
+        val s = vm(FakeRepositories()).uiState.value
+        assertNull(s.savedStartedAt)
+        assertNull(s.savedPressureHpa)
+        assertNull(s.savedPressureDeltaHpa)
+        assertFalse(s.isPressureStale)
+    }
+
+    @Test
+    fun FR404_日時を変えると表示中の気圧は古いものとして扱う() = runTest {
+        val fakes = FakeRepositories()
+        val id = fakes.attacks.save(Attack(0, Instant.parse("2026-11-01T00:00:00Z"), Severity.MILD, 1005.0, emptyList(), pressureDeltaHpa = -3.4))
+        val vm = vm(fakes, id)
+        vm.setStartedAt(Instant.parse("2026-11-02T00:00:00Z"))
+        assertTrue(vm.uiState.value.isPressureStale)
+        vm.setStartedAt(Instant.parse("2026-11-01T00:00:00Z"))
+        assertFalse(vm.uiState.value.isPressureStale)
+    }
+
+    @Test
+    fun FR404_日時を変えずに保存すると前日差を保ち_変えると取り直す() = runTest {
+        val t0 = Instant.parse("2026-11-01T00:00:00Z")
+        val t1 = t0.plus(Duration.ofHours(96))
+        // 時刻 (t0-24h を基準にした経過時間 h) ごとに 1000 + h^2/100 hPa。差は時刻によって異なる。
+        val points = listOf(0L, 24, 96, 120).map { h ->
+            PressurePoint(t0.minus(Duration.ofHours(24)).plus(Duration.ofHours(h)), 1000.0 + h * h / 100.0)
+        }
+        val fakes = FakeRepositories(pressure = FakePressureRepository(points))
+        val id = fakes.attacks.save(Attack(0, t0, Severity.MILD, null, emptyList()))
+        val before = fakes.attacks.observeAttack(id).first()!!
+        assertEquals(5.76, before.pressureDeltaHpa!!, 1e-6) // p(t0) - p(t0-24h) = 1005.76 - 1000
+
+        // 日時を変えずに保存 → 保存済みの差を保つ
+        vm(fakes, id).apply { save() }
+        assertEquals(5.76, fakes.attacks.observeAttack(id).first()!!.pressureDeltaHpa!!, 1e-6)
+
+        // 日時を変えて保存 → 新しい時刻で取り直す (古い差を引きずらない)
+        vm(fakes, id).apply { setStartedAt(t1); save() }
+        val after = fakes.attacks.observeAttack(id).first()!!
+        assertEquals(t1, after.startedAt)
+        assertEquals(51.84, after.pressureDeltaHpa!!, 1e-6) // p(t1)=1144.0, p(t1-24h)=1092.16
+    }
 }

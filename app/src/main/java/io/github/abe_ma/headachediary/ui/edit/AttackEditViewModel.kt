@@ -50,7 +50,14 @@ data class AttackEditUiState(
     val postSavePrompt: PostSavePrompt = PostSavePrompt.NONE,
     /** 開いた時点から内容が変わっている (未保存で戻る時の確認に使う)。 */
     val isDirty: Boolean = false,
+    /** FR-404: 既存記録の保存済みの値 (読み取り専用で表示)。新規は null。 */
+    val savedStartedAt: Instant? = null,
+    val savedPressureHpa: Double? = null,
+    val savedPressureDeltaHpa: Double? = null,
 ) {
+    /** 日時を変えると保存時に気圧と前日差を取り直すので、表示中の値は古くなる。 */
+    val isPressureStale: Boolean get() = savedStartedAt != null && savedStartedAt != startedAt
+
     /** 保存できる状態か。痛みの強さを選ぶまで保存できない (FR-202)。 */
     val canSave: Boolean get() = !isLoading && !notFound && !isBusy && severity != null
 }
@@ -136,6 +143,9 @@ class AttackEditViewModel @Inject constructor(
                             isNew = false,
                             startedAt = loaded.startedAt,
                             severity = loaded.severity,
+                            savedStartedAt = loaded.startedAt,
+                            savedPressureHpa = loaded.pressureHpa,
+                            savedPressureDeltaHpa = loaded.pressureDeltaHpa,
                             intakes = loaded.intakes.map { i ->
                                 IntakeDraft(nextKey++, i.id, i.medication, i.tablets, i.effect)
                             },
@@ -214,6 +224,7 @@ class AttackEditViewModel @Inject constructor(
                 severity = severity,
                 // 日時を変えたら気圧を引き直すため null を渡す (保存時に Repository が解決する)。
                 pressureHpa = original?.takeIf { it.startedAt == s.startedAt }?.pressureHpa,
+                pressureDeltaHpa = original?.takeIf { it.startedAt == s.startedAt }?.pressureDeltaHpa,
                 intakes = s.intakes.map { Intake(it.id, it.medication, it.tablets, it.effect) },
             )
             runCatching { attackRepository.save(attack) }

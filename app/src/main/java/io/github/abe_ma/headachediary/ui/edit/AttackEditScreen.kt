@@ -67,7 +67,12 @@ import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.Severity
+import io.github.abe_ma.headachediary.ui.DeltaDirection
 import io.github.abe_ma.headachediary.ui.formatDate
+import io.github.abe_ma.headachediary.ui.formatPressure
+import io.github.abe_ma.headachediary.ui.formatPressureDelta
+import io.github.abe_ma.headachediary.ui.formatPressureDeltaMagnitude
+import io.github.abe_ma.headachediary.ui.pressureDeltaDirection
 import io.github.abe_ma.headachediary.ui.formatTime
 import io.github.abe_ma.headachediary.ui.labelRes
 import io.github.abe_ma.headachediary.ui.settings.notificationPermissionName
@@ -82,6 +87,10 @@ const val TAG_NOTIFY_ACCEPT = "notify_prompt_accept"
 const val TAG_NOTIFY_DECLINE = "notify_prompt_decline"
 const val TAG_BACK = "edit_back"
 const val TAG_DISCARD_CONFIRM = "edit_discard_confirm"
+const val TAG_PRESSURE_INFO = "edit_pressure_info"
+const val TAG_PRESSURE_VALUE = "edit_pressure_value"
+const val TAG_PRESSURE_DELTA = "edit_pressure_delta"
+const val TAG_PRESSURE_STALE = "edit_pressure_stale"
 const val TAG_SAVE = "edit_save"
 const val TAG_SAVE_REASON = "edit_save_reason"
 const val TAG_SEVERITY_REQUIRED = "severity_required"
@@ -213,6 +222,8 @@ fun AttackEditContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             DateTimeSection(state.startedAt, zone, onDateTimeChange)
+            // FR-404: 既存記録のみ、保存済みの気圧と前日差を読み取り専用で表示する。
+            if (!state.isNew && !state.isLoading) PressureInfoSection(state)
             // 既存記録の読み込み中は強さがまだ入っていないので、未選択の警告は出さない。
             SeveritySection(state.severity, showRequired = !state.isLoading && !state.notFound, onChange = onSeverityChange)
             IntakeSection(state.intakes, onAddMedication, onRemoveIntake, onTabletsChange, onEffectChange)
@@ -358,6 +369,60 @@ private fun DateTimeSection(startedAt: Instant, zone: ZoneId, onChange: (Instant
                 }
             },
         )
+    }
+}
+
+/** FR-404: 記録時の気圧と前日との気圧差 (読み取り専用)。取得できないときは「取得できませんでした」。 */
+@Composable
+private fun PressureInfoSection(state: AttackEditUiState) {
+    val unavailable = stringResource(R.string.edit_pressure_unavailable)
+    val hpa = state.savedPressureHpa
+    val delta = state.savedPressureDeltaHpa
+    val valueText = hpa?.let { stringResource(R.string.edit_pressure_value, formatPressure(it)) } ?: unavailable
+    val deltaText = delta?.let { stringResource(R.string.edit_pressure_value, formatPressureDelta(it)) } ?: unavailable
+    // 読み上げは記号に頼らず言葉で (助言なし)。
+    val deltaSpoken = delta?.let {
+        when (pressureDeltaDirection(it)) {
+            DeltaDirection.LOWER -> stringResource(R.string.record_a11y_delta_lower, formatPressureDeltaMagnitude(it))
+            DeltaDirection.HIGHER -> stringResource(R.string.record_a11y_delta_higher, formatPressureDeltaMagnitude(it))
+            DeltaDirection.SAME -> stringResource(R.string.record_a11y_delta_same)
+        }
+    } ?: unavailable
+    val label = stringResource(R.string.edit_pressure_label)
+    val deltaLabel = stringResource(R.string.edit_pressure_delta_label)
+    Column(Modifier.testTag(TAG_PRESSURE_INFO), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.edit_section_pressure))
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoRow(label, valueText, Modifier.testTag(TAG_PRESSURE_VALUE).semantics(mergeDescendants = true) {
+                    contentDescription = "$label $valueText"
+                })
+                InfoRow(deltaLabel, deltaText, Modifier.testTag(TAG_PRESSURE_DELTA).semantics(mergeDescendants = true) {
+                    contentDescription = "$deltaLabel $deltaSpoken"
+                })
+                Text(
+                    stringResource(R.string.edit_pressure_readonly),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (state.isPressureStale) {
+            Text(
+                stringResource(R.string.edit_pressure_stale),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(TAG_PRESSURE_STALE),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }
 

@@ -4,7 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -210,5 +212,41 @@ class AttackEditScreenTest {
         }
         rule.onNodeWithTag(TAG_BACK).performClick()
         assertEquals(1, backed)
+    }
+
+    @Test
+    fun FR404_既存記録では保存済みの気圧と前日差を読み取り専用で表示する() {
+        host(base.copy(isNew = false, severity = Severity.MILD, savedStartedAt = base.startedAt, savedPressureHpa = 1013.2, savedPressureDeltaHpa = -3.4))
+        rule.onNodeWithTag(TAG_PRESSURE_INFO).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(TAG_PRESSURE_VALUE).assertTextContains("1013.2 hPa", substring = true)
+        rule.onNodeWithTag(TAG_PRESSURE_DELTA).assertTextContains("-3.4 hPa", substring = true)
+        rule.onNodeWithTag(TAG_PRESSURE_DELTA).assertContentDescriptionContains("前日より 3.4 hPa 低い", substring = true)
+        rule.onNodeWithTag(TAG_PRESSURE_STALE).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR404_取得できなかった値は取得できませんでしたと表示する() {
+        host(base.copy(isNew = false, severity = Severity.MILD, savedStartedAt = base.startedAt, savedPressureHpa = null, savedPressureDeltaHpa = null))
+        rule.onNodeWithTag(TAG_PRESSURE_VALUE).performScrollTo().assertTextContains("取得できませんでした", substring = true)
+        rule.onNodeWithTag(TAG_PRESSURE_DELTA).assertTextContains("取得できませんでした", substring = true)
+    }
+
+    @Test
+    fun FR404_気圧だけあって前日差が無いときは差だけ取得できませんでした() {
+        host(base.copy(isNew = false, severity = Severity.MILD, savedStartedAt = base.startedAt, savedPressureHpa = 1013.2, savedPressureDeltaHpa = null))
+        rule.onNodeWithTag(TAG_PRESSURE_VALUE).performScrollTo().assertTextContains("1013.2 hPa", substring = true)
+        rule.onNodeWithTag(TAG_PRESSURE_DELTA).assertTextContains("取得できませんでした", substring = true)
+    }
+
+    @Test
+    fun FR404_新規作成では気圧の欄を表示しない() {
+        host(base)
+        rule.onNodeWithTag(TAG_PRESSURE_INFO).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR404_日時を変えたら保存時に取り直す旨を表示する() {
+        host(base.copy(isNew = false, severity = Severity.MILD, savedStartedAt = base.startedAt.minusSeconds(3600), savedPressureHpa = 1013.2, savedPressureDeltaHpa = -3.4))
+        rule.onNodeWithTag(TAG_PRESSURE_STALE).performScrollTo().assertIsDisplayed()
     }
 }
