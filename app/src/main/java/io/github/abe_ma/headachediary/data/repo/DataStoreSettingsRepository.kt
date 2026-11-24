@@ -50,9 +50,3 @@ class DataStoreSettingsRepository(private val store: DataStore<Preferences>) : S
         }
     }
 }
-
-/** T-08 までの no-op。 */
-class NoOpReminderScheduler : io.github.abe_ma.headachediary.domain.ReminderScheduler {
-    override fun scheduleEffectReminder(attackId: Long, delayMinutes: Int) = Unit
-    override fun cancelEffectReminder(attackId: Long) = Unit
-}

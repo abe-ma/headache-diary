@@ -9,7 +9,7 @@ import io.github.abe_ma.headachediary.data.export.FileExportRepository
 import io.github.abe_ma.headachediary.data.export.PdfOutput
 import io.github.abe_ma.headachediary.data.fake.FakePressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
-import io.github.abe_ma.headachediary.data.repo.NoOpReminderScheduler
+import io.github.abe_ma.headachediary.domain.ReminderScheduler
 import io.github.abe_ma.headachediary.data.repo.RoomAttackRepository
 import io.github.abe_ma.headachediary.data.repo.RoomMedicationRepository
 import io.github.abe_ma.headachediary.domain.Attack
@@ -71,7 +71,10 @@ class ExportRepositoryTest {
         val settings = DataStoreSettingsRepository(
             PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { File(tmp.root, "s.preferences_pb") },
         )
-        attacks = RoomAttackRepository(db, pressure, settings, NoOpReminderScheduler(), { zone }, { now })
+        attacks = RoomAttackRepository(db, pressure, settings, object : ReminderScheduler {
+            override fun scheduleEffectReminder(attackId: Long, delayMinutes: Int) = Unit
+            override fun cancelEffectReminder(attackId: Long) = Unit
+        }, { zone }, { now })
         meds = RoomMedicationRepository(db)
         export = FileExportRepository(ctx, attacks, pressure, { zone }, { now }, pdfOutput = { CanvasPdfOutput() })
         File(ctx.cacheDir, "exports").deleteRecursively()

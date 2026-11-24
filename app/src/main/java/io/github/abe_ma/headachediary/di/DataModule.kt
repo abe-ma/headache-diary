@@ -16,6 +16,8 @@ import io.github.abe_ma.headachediary.data.remote.OpenMeteoApi
 import io.github.abe_ma.headachediary.data.repo.RoomPressureRepository
 import io.github.abe_ma.headachediary.data.repo.DataStoreSettingsRepository
 import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler
+import io.github.abe_ma.headachediary.data.notify.EffectReminderSync
+import io.github.abe_ma.headachediary.data.notify.effectWorkExists
 import io.github.abe_ma.headachediary.data.notify.WorkManagerReminderScheduler
 import io.github.abe_ma.headachediary.data.repo.NotifyAwareSettingsRepository
 import io.github.abe_ma.headachediary.data.work.PressureRefreshScheduler
@@ -40,13 +42,19 @@ object DataModule {
     fun database(@ApplicationContext c: Context): AppDatabase = AppDatabase.create(c)
 
     @Provides @Singleton
-    fun settings(@ApplicationContext c: Context): SettingsRepository =
+    fun settings(@ApplicationContext c: Context, db: AppDatabase, reminders: ReminderScheduler): SettingsRepository =
         NotifyAwareSettingsRepository(DataStoreSettingsRepository(c.settingsDataStore)) { old, new ->
             // 地域を登録/変更したら直ちに 1 回取得 (初回 31 日分)。次の日次まで待たない。
             if (new.prefectureCode != null && new.prefectureCode != old.prefectureCode) PressureRefreshScheduler.enqueueNow(c)
             // 気圧低下通知のオン/オフ・時刻の変更を予約に反映。
             if (old.dropNotifyEnabled != new.dropNotifyEnabled || old.dropNotifyTime != new.dropNotifyTime) {
                 DropNotifyScheduler.reschedule(c, new)
+            }
+            // FR-505: 効果リマインドのオン → 直近の未評価の発作に予約 (直前に保存した発作を含む)。オフ → 予約済みを取消。
+            if (!old.effectReminderEnabled && new.effectReminderEnabled) {
+                EffectReminderSync(db, reminders).restore(new) { id -> effectWorkExists(c, id, activeOnly = true) }
+            } else if (old.effectReminderEnabled && !new.effectReminderEnabled) {
+                EffectReminderSync(db, reminders).cancelPending()
             }
         }
 

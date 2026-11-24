@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.first
  */
 class NotifyAwareSettingsRepository(
     private val delegate: SettingsRepository,
-    private val onChanged: (old: Settings, new: Settings) -> Unit,
+    private val onChanged: suspend (old: Settings, new: Settings) -> Unit,
 ) : SettingsRepository {
     override fun observe(): Flow<Settings> = delegate.observe()
 

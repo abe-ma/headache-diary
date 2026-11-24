@@ -148,6 +148,12 @@ class PressureDropWorker(context: Context, params: WorkerParameters) : Coroutine
     }
 }
 
+/** 効果リマインドの WorkManager 上の有無 (ブロッキング。IO で呼ぶ)。 */
+internal suspend fun effectWorkExists(context: Context, attackId: Long, activeOnly: Boolean): Boolean = withContext(Dispatchers.IO) {
+    WorkManager.getInstance(context).getWorkInfosForUniqueWork(WorkManagerReminderScheduler.tag(attackId)).get()
+        .any { !activeOnly || !it.state.isFinished }
+}
+
 /** 起動時の再予約 (App.onCreate から)。 */
 object NotifyBootstrap {
     private const val NAME = "notify-bootstrap"
@@ -160,10 +166,9 @@ object NotifyBootstrap {
 class NotifyBootstrapWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val e = ep(applicationContext)
-        val wm = WorkManager.getInstance(applicationContext)
         NotifyBootstrapJob(
             e.database(), e.settingsRepository(), e.reminderScheduler(),
-            hasEffectWork = { id -> withContext(Dispatchers.IO) { wm.getWorkInfosForUniqueWork(WorkManagerReminderScheduler.tag(id)).get().isNotEmpty() } },
+            hasEffectWork = { id -> effectWorkExists(applicationContext, id, activeOnly = false) },
             scheduleDrop = { DropNotifyScheduler.reschedule(applicationContext, it) },
         ).run()
         return Result.success()

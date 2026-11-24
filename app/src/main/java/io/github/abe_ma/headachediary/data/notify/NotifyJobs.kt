@@ -82,25 +82,46 @@ class DropNotifyJob(
     }
 }
 
-/** 起動時の再予約 (再起動・バックアップ復元後。WorkManager の DB は復元されない)。 */
-class NotifyBootstrapJob(
+/**
+ * 効果リマインドの復元・取消 (直近 12 時間の未評価の発作が対象)。
+ * 起動時の再予約 (NotifyBootstrapJob) と、設定で効果リマインドを切り替えたとき (FR-505) の両方で使う。
+ */
+class EffectReminderSync(
     private val db: AppDatabase,
-    private val settings: SettingsRepository,
     private val reminders: ReminderScheduler,
-    private val hasEffectWork: suspend (attackId: Long) -> Boolean,
-    private val scheduleDrop: (io.github.abe_ma.headachediary.domain.Settings) -> Unit,
     private val now: () -> Instant = Instant::now,
 ) {
+    private suspend fun recentUnrated() = db.attackDao().getUnratedSince(now().minus(WINDOW).toEpochMilli())
+
+    /** 予約済みでない (hasWork が false の) 未評価の発作に、設定の遅延で予約する。 */
+    suspend fun restore(s: io.github.abe_ma.headachediary.domain.Settings, hasWork: suspend (attackId: Long) -> Boolean) {
+        if (!s.effectReminderEnabled) return
+        recentUnrated().forEach { a -> if (!hasWork(a.id)) reminders.scheduleEffectReminder(a.id, s.effectReminderDelayMinutes) }
+    }
+
+    /** オフにしたとき: 予約済みの取消 (表示済みの通知も消える)。 */
+    suspend fun cancelPending() {
+        recentUnrated().forEach { reminders.cancelEffectReminder(it.id) }
+    }
+
+    companion object { val WINDOW: Duration = Duration.ofHours(12) }
+}
+
+/** 起動時の再予約 (再起動・バックアップ復元後。WorkManager の DB は復元されない)。 */
+class NotifyBootstrapJob(
+    db: AppDatabase,
+    private val settings: SettingsRepository,
+    reminders: ReminderScheduler,
+    private val hasEffectWork: suspend (attackId: Long) -> Boolean,
+    private val scheduleDrop: (io.github.abe_ma.headachediary.domain.Settings) -> Unit,
+    now: () -> Instant = Instant::now,
+) {
+    private val sync = EffectReminderSync(db, reminders, now)
+
     suspend fun run() {
         val s = settings.observe().first()
         scheduleDrop(s)
-        if (!s.effectReminderEnabled) return
-        // 直近 12 時間の未評価の発作で、リマインダーの記録 (実行済みを含む) が無いものだけ予約し直す。
-        val since = now().minus(RESTORE_WINDOW).toEpochMilli()
-        db.attackDao().getUnratedSince(since).forEach { a ->
-            if (!hasEffectWork(a.id)) reminders.scheduleEffectReminder(a.id, s.effectReminderDelayMinutes)
-        }
+        // リマインダーの記録 (実行済みを含む) が無いものだけ予約し直す (通知の再送を避ける)。
+        sync.restore(s, hasEffectWork)
     }
-
-    companion object { val RESTORE_WINDOW: Duration = Duration.ofHours(12) }
 }

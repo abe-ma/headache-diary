@@ -15,6 +15,7 @@ import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler.runThenRes
 import io.github.abe_ma.headachediary.data.notify.DropNotifyJob.Result
 import io.github.abe_ma.headachediary.data.notify.DropNotifyScheduler
 import io.github.abe_ma.headachediary.data.notify.EffectReminderJob
+import io.github.abe_ma.headachediary.data.notify.EffectReminderSync
 import io.github.abe_ma.headachediary.data.notify.NotifyBootstrapJob
 import io.github.abe_ma.headachediary.data.notify.NotifyStateStore
 import io.github.abe_ma.headachediary.data.notify.Notifier
@@ -303,5 +304,49 @@ class NotificationTest {
     fun FR_505_notification_settings_default_to_off() = runBlocking {
         val d = settings.observe().first()
         assertFalse(d.effectReminderEnabled); assertFalse(d.dropNotifyEnabled)
+    }
+
+    @Test
+    fun FR_505_enabling_effect_reminder_schedules_recent_unrated_attacks_not_already_active() = runBlocking {
+        val now = at(today, 12)
+        insertAttack(1, now.minusSeconds(600), "UNRATED") // 直前に保存した発作 ("受け取る" の直後)
+        insertAttack(2, now.minusSeconds(3600), "UNRATED") // 既に有効な予約あり
+        insertAttack(3, now.minusSeconds(3600), "EFFECTIVE")
+        insertAttack(4, now.minusSeconds(13 * 3600L), "UNRATED") // 12h より古い
+        val r = RecordingReminders()
+        val repo = NotifyAwareSettingsRepository(settings) { old, new ->
+            if (!old.effectReminderEnabled && new.effectReminderEnabled) EffectReminderSync(db, r) { now }.restore(new) { it == 2L }
+        }
+        repo.update { it.copy(effectReminderDelayMinutes = 30) } // 有効化ではない → 何もしない
+        assertTrue(r.scheduled.isEmpty())
+        repo.update { it.copy(effectReminderEnabled = true) }
+        assertEquals(listOf(1L to 30), r.scheduled)
+    }
+
+    @Test
+    fun FR_505_disabling_effect_reminder_cancels_pending_ones_for_recent_unrated_attacks() = runBlocking {
+        val now = at(today, 12)
+        insertAttack(1, now.minusSeconds(600), "UNRATED")
+        insertAttack(2, now.minusSeconds(600), "EFFECTIVE")
+        val cancelled = mutableListOf<Long>()
+        val r = object : ReminderScheduler {
+            override fun scheduleEffectReminder(attackId: Long, delayMinutes: Int) = Unit
+            override fun cancelEffectReminder(attackId: Long) { cancelled += attackId }
+        }
+        EffectReminderSync(db, r) { now }.cancelPending()
+        assertEquals(listOf(1L), cancelled)
+    }
+
+    @Test
+    fun FR_505_restore_does_nothing_when_effect_reminder_is_off() = runBlocking {
+        insertAttack(1, at(today, 11), "UNRATED")
+        val r = RecordingReminders()
+        EffectReminderSync(db, r) { at(today, 12) }.restore(Settings(null, effectReminderEnabled = false)) { false }
+        assertTrue(r.scheduled.isEmpty())
+    }
+
+    @Test
+    fun FR_105_daily_pressure_work_retry_is_capped() {
+        assertEquals(4, io.github.abe_ma.headachediary.data.work.PressureRefreshJob.MAX_RETRIES)
     }
 }

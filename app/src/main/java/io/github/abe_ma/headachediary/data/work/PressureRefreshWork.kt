@@ -49,7 +49,12 @@ class PressureRefreshJob(
         }
     }
 
-    companion object { const val BACKFILL_DAYS = 31L }
+    companion object {
+        const val BACKFILL_DAYS = 31L
+
+        /** Result.retry() の上限 (指数バックオフ 15分〜)。超えたら次の日次実行に任せる。 */
+        const val MAX_RETRIES = 4
+    }
 }
 
 @EntryPoint
@@ -69,7 +74,8 @@ class PressureRefreshWorker(context: Context, params: WorkerParameters) : Corout
         val ep = EntryPointAccessors.fromApplication(applicationContext, PressureWorkEntryPoint::class.java)
         return when (PressureRefreshJob(ep.pressureRepository(), ep.database()).run()) {
             PressureRefreshJob.Outcome.DONE -> Result.success()
-            PressureRefreshJob.Outcome.RETRY -> Result.retry()
+            // 失敗が続く場合は上限で打ち切る (日次の定期実行が翌日また試す)。
+            PressureRefreshJob.Outcome.RETRY -> if (runAttemptCount < PressureRefreshJob.MAX_RETRIES) Result.retry() else Result.success()
         }
     }
 }
