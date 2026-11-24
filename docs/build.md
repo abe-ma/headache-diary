@@ -66,3 +66,25 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 
 ### 検証していないこと
 実機/エミュレータでの起動・操作、release APK の実行、バックアップ復元。debug APK は実機への手動インストール用 (`adb install -r app/build/outputs/apk/debug/app-debug.apk`)。
+
+## 最終確認 T-15 (HEAD 88a0737 / 2026-11-24)
+検証対象: **`git archive 88a0737` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。
+`./gradlew --no-parallel --max-workers=2` でタスクを 1 つずつ実行。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (202 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (**0 errors / 6 warnings**: MonochromeLauncherIcon 1, OldTargetApi 1, UnusedResources 1, UseKtx 3。前回の error は解消) |
+| assembleDebug | 成功 |
+| assembleRelease (R8) | 成功 (署名なし) |
+| bundleRelease | 成功 (署名なし) |
+
+versionName `0.1.0` / versionCode `1`。
+
+| 成果物 | サイズ | sha256 |
+| --- | --- | --- |
+| app-debug.apk | 16,512,017 B | `8045f78fd5d7a33fd29fde54d6b0a23e803745309189d543245210116acec52c` |
+| app-release-unsigned.apk | 2,495,683 B | `0c6fe931a086e15f0e5c85e054893109b30f414dabe0d4aaedae4bef53f17594` |
+| app-release.aab | 5,793,838 B | `9ddb8e1c33bb996d4b7b1aaaf769cefa36fede91731649f224938c42c8cad275` |
+
+未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
