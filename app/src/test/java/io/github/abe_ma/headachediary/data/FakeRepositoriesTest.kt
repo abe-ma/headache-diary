@@ -248,4 +248,41 @@ class FakeRepositoriesTest {
         assertTrue(!r.medications.addCustom("ロキソニン").isHidden)
         assertTrue(r.medications.observeCandidates().first().any { it.id == loxo.id })
     }
+
+    @Test
+    fun FR_404_fake_resolves_delta_as_p_t_minus_p_24h_before_and_null_if_either_missing() = runTest {
+        val day = java.time.Duration.ofHours(24)
+        val pressure = io.github.abe_ma.headachediary.data.fake.FakePressureRepository(
+            listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day), 1012.5), PressurePoint(t0.plusSeconds(3 * 3600), 1000.0)),
+        )
+        val r = FakeRepositories(pressure = pressure)
+        val a = r.attacks.save(attack(t0))
+        assertEquals(-4.5, r.attacks.observeAttack(a).first()!!.pressureDeltaHpa!!, 1e-9) // マイナス=低下
+        // 24 時間前が ±1h 以内で取れる (30分ずれ) → 最寄りを使う
+        val b = r.attacks.save(attack(t0.plusSeconds(1800)))
+        assertEquals(1008.0 - 1012.5, r.attacks.observeAttack(b).first()!!.pressureDeltaHpa!!, 1e-9)
+        // 24 時間前のデータなし → null (気圧は取れていても)
+        val c = r.attacks.save(attack(t0.plusSeconds(3 * 3600)))
+        assertEquals(1000.0, r.attacks.observeAttack(c).first()!!.pressureHpa!!, 0.0)
+        assertNull(r.attacks.observeAttack(c).first()!!.pressureDeltaHpa)
+        // 発作時の気圧が無い → null
+        val d = r.attacks.save(attack(t0.plusSeconds(40 * 3600)))
+        assertNull(r.attacks.observeAttack(d).first()!!.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_fake_keeps_delta_on_edit_and_recomputes_when_time_changes() = runTest {
+        val day = java.time.Duration.ofHours(24)
+        val pressure = io.github.abe_ma.headachediary.data.fake.FakePressureRepository(
+            listOf(PressurePoint(t0, 1008.0), PressurePoint(t0.minus(day), 1010.0)),
+        )
+        val r = FakeRepositories(pressure = pressure)
+        val id = r.attacks.save(attack(t0))
+        val saved = r.attacks.observeAttack(id).first()!!
+        pressure.points.value = emptyList() // 後でデータが変わっても保存値を維持 (書き出し時に再計算しない)
+        r.attacks.save(saved.copy(severity = Severity.MILD))
+        assertEquals(-2.0, r.attacks.observeAttack(id).first()!!.pressureDeltaHpa!!, 1e-9)
+        r.attacks.save(saved.copy(startedAt = t0.plusSeconds(10 * 3600))) // 日時変更 → 再解決 (データなし → null)
+        assertNull(r.attacks.observeAttack(id).first()!!.pressureDeltaHpa)
+    }
 }

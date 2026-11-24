@@ -17,6 +17,9 @@ data class Attack(
     val severity: Severity,
     val pressureHpa: Double?, // FR-104: 保存時の紐づけ。欠損可
     val intakes: List<Intake>,
+    // FR-404: 発作時 − 24時間前の気圧差 (hPa、マイナス=低下)。欠損可。UI は null を渡せば Repository が解決する。
+    // 既存の位置引数の呼び出しを壊さないよう末尾に置く (デフォルト値つき)。
+    val pressureDeltaHpa: Double? = null,
 )
 
 /** 服薬1件。FR-203, 204, 205 */

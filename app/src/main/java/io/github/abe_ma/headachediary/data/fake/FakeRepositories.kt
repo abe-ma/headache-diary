@@ -3,6 +3,7 @@ package io.github.abe_ma.headachediary.data.fake
 import android.net.Uri
 import io.github.abe_ma.headachediary.data.catalog.StaticPrefectureRepository
 import io.github.abe_ma.headachediary.data.catalog.presetMedications
+import io.github.abe_ma.headachediary.data.repo.PressureDelta
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.ExportRepository
@@ -95,9 +96,12 @@ class FakeAttackRepository(
         val intakes = attack.intakes.map { if (it.id == 0L) it.copy(id = nextIntakeId++) else it }
         // 実装 (Room) と同じ: 日時を変えた編集では保存済みの気圧を捨てて再解決する。
         val old = state.value.firstOrNull { it.id == id }
-        val keep = if (old != null && old.startedAt != attack.startedAt) null else attack.pressureHpa
-        val hpa = keep ?: pressure?.pressureAt(attack.startedAt)
-        val saved = attack.copy(id = id, intakes = intakes, pressureHpa = hpa)
+        val timeChanged = old != null && old.startedAt != attack.startedAt
+        val hpa = (if (timeChanged) null else attack.pressureHpa) ?: pressure?.pressureAt(attack.startedAt)
+        // FR-404: 気圧差も同様 (保存値があれば維持、日時変更時は再解決、取れなければ null)。
+        val delta = (if (timeChanged) null else attack.pressureDeltaHpa)
+            ?: pressure?.let { PressureDelta.resolve(it, attack.startedAt, hpa) }
+        val saved = attack.copy(id = id, intakes = intakes, pressureHpa = hpa, pressureDeltaHpa = delta)
         state.update { list -> list.filter { it.id != id } + saved }
         return id
     }
