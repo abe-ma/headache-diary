@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 文言はここに集約。manager が確認する (NFR-104: 医療的助言・診断を含めない)。 -->
+<!-- 文言はここに集約 (NFR-104: 医療的助言・診断を含めない)。 -->
 <resources>
     <string name="app_name">頭痛ダイアリー</string>
     <string name="tab_record">記録</string>

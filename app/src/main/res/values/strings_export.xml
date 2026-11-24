@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- T-09a: CSV/PDF 書き出しの文言 (android-data 作成、manager が文言確認)。医療的助言・診断を含めない (NFR-104)。 -->
+<!-- CSV/PDF 書き出しの文言。医療的助言・診断を含めない (NFR-104)。 -->
 <resources>
     <!-- CSV 見出し (FR-400) -->
     <string name="export_csv_datetime">発作日時</string>

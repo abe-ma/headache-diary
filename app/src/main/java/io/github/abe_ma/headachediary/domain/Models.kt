@@ -62,7 +62,7 @@ data class Prefecture(val code: String, val name: String, val lat: Double, val l
 
 /**
  * 気圧取得の結果。FR-101, 105。`refresh()` は例外を投げずにこれを返す。
- * (設計書に型の定義がなかったため T-02 で追加。manager に報告済みの補足事項)
+ * (設計書に型の定義がなかったため実装時に追加した)
  */
 sealed interface RefreshResult {
     data object Success : RefreshResult

@@ -19,3 +19,6 @@ keystore.properties
 # OS / その他
 .DS_Store
 *.log
+
+# Kotlin コンパイラのセッションデータ
+.kotlin/

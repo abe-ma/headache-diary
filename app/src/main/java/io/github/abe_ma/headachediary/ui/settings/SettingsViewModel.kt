@@ -55,7 +55,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * FR-100: 地域の登録 (null = 未設定)。保存後の即時取得は SettingsRepository 側の責務 (android-data)。
+     * FR-100: 地域の登録 (null = 未設定)。保存後の即時取得は SettingsRepository 側の責務。
      */
     fun setPrefecture(code: String?) = update { it.copy(prefectureCode = code) }
 
