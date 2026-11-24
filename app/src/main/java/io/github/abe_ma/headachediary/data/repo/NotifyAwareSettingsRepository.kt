@@ -26,7 +26,8 @@ class NotifyAwareSettingsRepository(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                android.util.Log.w("NotifyAwareSettings", "onChanged failed", e)
+                // 例外クラス名のみ記録 (メッセージ/スタックには SQL や健康データが混ざりうるため出さない)
+                android.util.Log.w("NotifyAwareSettings", "onChanged failed: ${e.javaClass.simpleName}")
             }
         }
     }

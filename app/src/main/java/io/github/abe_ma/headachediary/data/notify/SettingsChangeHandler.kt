@@ -40,7 +40,8 @@ class SettingsChangeHandler(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "settings side effect failed: $what", e)
+            // 例外クラス名のみ記録 (メッセージ/スタックには SQL や健康データが混ざりうるため出さない)
+            Log.w(TAG, "settings side effect failed: $what (${e.javaClass.simpleName})")
         }
     }
 
