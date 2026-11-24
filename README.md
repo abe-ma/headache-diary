@@ -37,3 +37,6 @@ JDK 17 と Android SDK (platform 36 以降) が必要です。`local.properties`
 
 ## 気圧データの出典
 Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0)。無料枠は非商用利用に限られます。商用利用 (広告・課金) をする場合は有料プランが必要です。
+
+## ライセンス
+[MIT License](LICENSE) (Copyright (c) 2026 abe-ma)。ただし気圧データは Open-Meteo のライセンス (CC BY 4.0、無料枠は非商用限定) に従います。
