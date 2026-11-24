@@ -88,3 +88,20 @@ versionName `0.1.0` / versionCode `1`。
 | app-release.aab | 5,793,838 B | `9ddb8e1c33bb996d4b7b1aaaf769cefa36fede91731649f224938c42c8cad275` |
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
+
+## 最終確認 T-15b (HEAD 207f7e8 / android-data のログ方針修正まで)
+検証対象: **`git archive 207f7e8` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2` で 1 タスクずつ。versionName `0.1.0` / versionCode `1` のまま。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (0 errors / 6 warnings: MonochromeLauncherIcon 1, OldTargetApi 1, UnusedResources 1, UseKtx 3。T-15 と同じ内訳) |
+| assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
+
+| 成果物 | サイズ | sha256 |
+| --- | --- | --- |
+| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-207f7e8-debug.apk`) | 16,512,017 B | `0352dde12a03da40507cb378098a41dbeee138f4e0c3ec48ad09c20c4b7ca3ff` |
+| app-release-unsigned.apk | 2,495,683 B | `21f28b1529d06ddb3cda836acdd13e75af7d982ed7df55d821f2fa66adc153f4` |
+| app-release.aab | 5,796,454 B | `95c6e9839235a843d65cc49b043d41b69638c89c8b61377a4d5ecd1ac75e3cf2` |
+
+未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。旧 88a0737 版 APK は `shared/artifacts/` に残してある。
