@@ -122,3 +122,20 @@ versionName `0.1.0` / versionCode `1`。
 | app-release.aab | 5,890,853 B | `d1a50f214adf222400d569e0a94f985131c2b602df6fa12a433982ae4d08c15c` |
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
+
+## 最終確認 T-15d (HEAD 2731f30 / T-18b アイコン前景縮小まで)
+検証対象: **`git archive 2731f30` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2`、versionName `0.1.0` / versionCode `1` のまま。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。T-15c と同内訳) |
+| assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
+
+| 成果物 | サイズ | sha256 |
+| --- | --- | --- |
+| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-2731f30-debug.apk`) | 16,601,064 B | `b2e4c935a2cb7c479447641e82681107450f5a410a67647e8f1480fa9f50f925` |
+| app-release-unsigned.apk | 2,568,187 B | `049a4f75aa2ab83e0d23c05c4f24151d6e2b201312090d772f8176a4d2768ea1` |
+| app-release.aab | 5,868,051 B | `41f5de05f3d1298e8ec98fccc061b5757578825a493c5423954ecca01f6bf670` |
+
+未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
