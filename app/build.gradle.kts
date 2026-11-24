@@ -14,7 +14,9 @@ val appVersionName = "0.1.0"
 
 // release 署名情報 (Git 管理外)。app/keystore.properties (無ければ rootProject 直下) が存在するときだけ署名する。
 // 無ければ従来どおり署名なしでビルドが通る (CI / 他人のクローン向け)。雛形は keystore.properties.example。
-val keystoreFile = listOf(file("keystore.properties"), rootProject.file("keystore.properties")).firstOrNull { it.isFile }
+// 場所を明示する場合: ./gradlew -PkeystoreProperties=/絶対パス/keystore.properties assembleRelease (別ディレクトリでのビルド用)
+val keystoreFile = (findProperty("keystoreProperties") as String?)?.let { file(it) }?.takeIf { it.isFile }
+    ?: listOf(file("keystore.properties"), rootProject.file("keystore.properties")).firstOrNull { it.isFile }
 val keystoreProps = Properties().apply { keystoreFile?.inputStream()?.use { load(it) } }
 val signingKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 if (keystoreFile != null) {
