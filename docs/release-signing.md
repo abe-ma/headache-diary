@@ -11,7 +11,7 @@
 2. **アップロード鍵**を開発者の手元で作る (値は各自が決める。紛失に備え安全な場所に複数バックアップ):
    `keytool -genkeypair -v -keystore upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`
 3. 署名情報は Git 管理外に置く: `app/keystore.properties` (storeFile / storePassword / keyAlias / keyPassword)。
-   `app/build.gradle.kts` に、ファイルが存在する時だけ `signingConfigs.create("release")` を読み込み `release` ビルドタイプへ適用する設定を追加する (build 担当が公開直前に実施。ファイル不在でもビルドが通ること)。
+   `app/build.gradle.kts` に、ファイルが存在する時だけ `signingConfigs.create("release")` を読み込み `release` ビルドタイプへ適用する設定を追加する (公開直前に追加する。ファイル不在でもビルドが通ること)。
    CI を使う場合は鍵とパスワードを CI のシークレットで渡す。
 4. `./gradlew bundleRelease` で署名済み AAB を生成し、Play Console の内部テストトラックへアップロード。Google が配信用の App Signing 鍵で再署名する。
 5. 公開前チェック: applicationId (`io.github.abe_ma.headachediary`) は公開後に変更不可。versionCode は提出ごとに増やす。データセーフティ (健康情報は端末内保存、外部送信は丸めた座標のみ) とプライバシーポリシー URL を用意する。

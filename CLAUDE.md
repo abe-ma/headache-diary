@@ -1,31 +1,31 @@
 # CLAUDE.md
 
-頭痛ダイアリー (Android アプリ) のリポジトリ。仕様駆動開発で進める。
+頭痛ダイアリー (Android アプリ) のリポジトリ。仕様駆動で開発する。仕様は `spec/`、設計メモ・検証記録は `docs/`。
 
-## 暫定スタック (未確定。manager がユーザーに確認して確定させる)
+## 技術スタック
 - 言語/UI: Kotlin + Jetpack Compose (Material 3)
 - アーキテクチャ: MVVM + Repository、単方向データフロー (StateFlow)
-- 永続化: Room (端末内のみ。クラウド同期なし)
-- DI: Hilt
-- 非同期: Kotlin Coroutines / Flow
-- リマインダー: WorkManager (正確な時刻が必要なら AlarmManager)
-- ビルド: Gradle (Kotlin DSL, version catalog)、minSdk/targetSdk は要決定
-- テスト: JUnit + Turbine (ユニット)、Compose UI テスト / Robolectric
+- 永続化: Room (端末内のみ。独自のクラウド同期なし。Android の自動バックアップは対象)
+- 設定: DataStore / DI: Hilt / 非同期: Kotlin Coroutines・Flow / 定期処理・通知: WorkManager
+- 通信: Retrofit + kotlinx.serialization (Open-Meteo のみ、API キー不要)
+- ビルド: Gradle (Kotlin DSL, version catalog)。minSdk 26 / targetSdk 36 / applicationId `io.github.abe_ma.headachediary`
+- テスト: JUnit + Turbine (ユニット)、Robolectric、Compose UI テスト
 
 ## パッケージ境界
-- `ui/` ← android-ui、`data/` `domain/` `di/` ← android-data。UI は domain の型と Repository インターフェースだけに依存する。
+- `ui/` (画面・ViewModel・テーマ)、`domain/` (モデル・Repository インターフェース)、`data/` (Room・DataStore・通信・通知・書き出しの実装)、`di/` (Hilt の束ね)。
+- UI は `domain` の型と Repository インターフェースだけに依存する。UI 専用の Hilt モジュールは `ui/` に置いてよい。
 
 ## 仕様が正
-- 仕様は `spec/` にあり、実装より優先する (`01-requirements.md`, `02-design.md`)。
-- 食い違い・不足は推測で実装せず、未決事項に追記して manager 経由でユーザーに確認する。
-- テスト名に要件ID (FR-xxx) を入れる。仕様を変えたら同じ変更に仕様更新を含める。
+- 仕様は `spec/` (`01-requirements.md`, `02-design.md`) にあり、実装より優先する。
+- 食い違い・不足は推測で実装せず、仕様を先に更新してから実装する。
+- テスト名に要件ID (FR-xxx / NFR-xxx) を入れる。仕様を変えたら同じ変更で仕様も更新する。
 
-## 想定する記録項目 (ヒアリングで確定する)
-発作日時(開始/終了)、痛みの強さ、部位、前兆、症状(吐き気・光/音過敏)、誘因、服薬(薬名/量/効果)、メモ、月経周期、天気/気圧 など。
+## 方針
+- 健康データ (発作・服薬・気圧との紐づけ) は端末内に保存し、外部へ送信しない。外部へ送るのは気圧取得のための丸めた座標 (小数1桁) と期間だけ (NFR-100)。
+- アプリは医療的助言・診断をしない。記録・集計・可視化まで (NFR-104)。文言は `strings*.xml` に集約する。
+- ログに例外メッセージやスタックトレースを出さない (SQL や健康データが混ざりうるため)。クラス名のみ。
 
-## 未決事項
-- 対象ユーザーと目的 (自己管理 / 受診時の提示資料)
-- 記録項目の範囲、気圧などの外部データ取得の要否 (外部通信するか)
-- 集計・グラフの種類、エクスポート形式 (CSV/PDF)
-- minSdk、アプリ名/パッケージ名、公開有無
-- バックアップ・端末間移行の方針
+## ビルドと検証
+- `./gradlew testDebugUnitTest` / `./gradlew lintDebug` / `./gradlew assembleDebug`。メモリが少ない環境では `--no-parallel --max-workers=2` を付け、終了後に `./gradlew --stop`。
+- 詳細は `docs/build.md`。実機でしか確認できない項目は `docs/device-checklist.md`。
+- 署名鍵 (`*.jks` / `keystore.properties`) と `local.properties` はコミットしない。公開手順は `docs/release-signing.md`。

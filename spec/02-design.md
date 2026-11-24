@@ -1,10 +1,10 @@
 # 設計 (頭痛ダイアリー)
-状態: 承認済み (2026-11-23)。要件は `01-requirements.md`。ここに書いた契約の変更は manager 経由で合意する。
+状態: 承認済み (2026-11-23)。要件は `01-requirements.md`。契約 (Repository インターフェース・ドメインモデル) を変えるときは、先にこの文書を更新する。
 
 ## 1. 構成
 - Kotlin + Jetpack Compose (Material 3)、MVVM + Repository、StateFlow、Room、Hilt、Coroutines/Flow、WorkManager、DataStore (設定)。
-- minSdk 26。パッケージ: `ui/` (android-ui)、`data/` `domain/` `di/` (android-data)。UI は `domain` の型と Repository インターフェースにのみ依存する。
-- ネットワークは Open-Meteo のみ (Retrofit か Ktor は android-data が選定。API キー不要)。
+- minSdk 26。パッケージ: `ui/`、`data/`、`domain/`、`di/`。UI は `domain` の型と Repository インターフェースにのみ依存する。
+- ネットワークは Open-Meteo のみ (Retrofit + kotlinx.serialization。API キー不要)。
 
 ## 2. データモデル (domain)
 時刻は UTC epoch ミリ秒で保存し、表示時に端末のタイムゾーンへ変換する。Open-Meteo へは `timezone=Asia/Tokyo&timeformat=unixtime` で要求する。
@@ -56,7 +56,7 @@ data class Settings(
 - 使用回数順 (FR-206) は `intake` の集計で算出する (専用カラムを持たない)。
 - 設定は DataStore。DB 移行は `exportSchema=true` で管理。
 
-## 3. Repository 契約 (domain、android-data が実装、android-ui が利用)
+## 3. Repository 契約 (domain に定義、data が実装、ui が利用)
 ```kotlin
 interface AttackRepository {
     fun observeAttacks(range: ClosedRange<Instant>? = null): Flow<List<Attack>>   // 新しい順
@@ -104,7 +104,7 @@ interface PrefectureRepository { fun all(): List<Prefecture> }
 - 気圧低下通知: 日次取得ジョブの後に判定し、設定時刻に通知するため `OneTimeWorkRequest` を設定時刻に再予約。通知チャンネルは2つ (効果入力 / 気圧低下)。
 - 再起動・バックアップ復元後はアプリ起動時に `SettingsRepository` から再予約する (WorkManager は再起動を越えて保持される)。
 
-## 4. 画面・遷移 (android-ui)
+## 4. 画面・遷移
 下部タブ3つ: **記録** / **集計** / **設定**。
 
 | 画面 | 内容 | 要件 |
@@ -117,30 +117,16 @@ interface PrefectureRepository { fun all(): List<Prefecture> }
 | 書き出し | 期間選択、CSV/PDF を選んで共有シートへ | FR-400〜402 |
 
 - 初回起動: 地域未設定でも記録は使える。集計/設定から地域設定を促す。気圧が無いグラフは「地域を設定すると気圧が表示されます」と案内する。
-- 文言は医療的助言・診断をしない (NFR-104)。文言は manager が確認する。
+- 文言は医療的助言・診断をしない (NFR-104)。文言は `strings*.xml` に集約する。
 
 ## 5. 権限・マニフェスト
 - `INTERNET`、`POST_NOTIFICATIONS` (API 33+、通知有効化時に要求)。位置情報権限は使わない。
 - `android:allowBackup="true"` + `dataExtractionRules` / `fullBackupContent` で Room DB と DataStore を含める (NFR-200)。
 - CSV/PDF の共有は `FileProvider` (キャッシュ配下に出力、一定期間後に削除)。
 
-## 6. タスク分解案 (承認後)
-| ID | 内容 | 担当 | 依存 |
-| --- | --- | --- | --- |
-| T-01 | Gradle 雛形 (version catalog, Hilt, Room, Compose, WorkManager)、CI なし、マニフェスト | build (追加) または android-data | 開発環境導入 |
-| T-02 | domain モデル + Repository インターフェース + プリセット薬/都道府県データ | android-data | T-01 |
-| T-03 | Room/DataStore 実装、AttackRepository/MedicationRepository | android-data | T-02 |
-| T-04 | 発作記録 UI (一覧・編集・薬選択) | android-ui | T-02 (契約) |
-| T-05 | Open-Meteo 連携、PressureRepository、日次ジョブ | android-data | T-02 |
-| T-06 | 集計 UI (月別回数、気圧グラフ、帰属表示) | android-ui | T-02 |
-| T-07 | 設定 UI + SettingsRepository + 地域選択 | android-ui / android-data | T-02 |
-| T-08 | 通知 (効果リマインド、気圧低下) | android-data (UI 側は通知タップ遷移) | T-03, T-05 |
-| T-09 | CSV/PDF エクスポート + 書き出し UI | android-data / android-ui | T-03, T-05 |
-| T-10 | プライバシーポリシー・ストア申告資料 (manager が起草) | manager | - |
-
-## 7. 実装との差分メモ (2026-11-23 統合レビュー反映)
+## 6. 実装との差分メモ (統合レビュー反映)
 - 画面: 上記に加え「薬の管理」(設定から、FR-207)、「書き出し」(設定から、FR-400〜403)、「このアプリについて」(設定から、帰属・データの扱い・注意書き) が実装された。通知の権限フロー (FR-505) は設定スイッチと、未評価服薬の初回保存後の一度きりの説明ダイアログ (UI 内 SharedPreferences、バックアップ対象外)。
 - 追加の契約: `RefreshResult` (Success / Failure(NO_PREFECTURE|NETWORK|API_ERROR))、`ReminderScheduler` (WorkManager 実装)、通知設定の変更フック (`NotifyAwareSettingsRepository`: 地域変更で即時取得、通知設定変更で再予約)。最終取得時刻は地域別 (FR-504)。
 - 通知: 効果リマインド・気圧低下とも既定オフ。ロック画面は公開版 (FR-506)。
 - 書き出し: CSV 末尾に Open-Meteo 帰属行 (FR-403)、PDF/CSV は薬名×数量+単位 (FR-209)。
-- 例外: UI 専用 Hilt モジュールは `ui/` に置く (PROTOCOL 参照)。
+- 例外: UI 専用の Hilt モジュールは `ui/` に置く。

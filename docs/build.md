@@ -1,4 +1,4 @@
-# ビルド構成と依存バージョン (T-01 / build)
+# ビルド構成と依存バージョン
 
 環境: JDK 17、Gradle 9.9.2 (wrapper)、Android SDK は `ANDROID_HOME` または `local.properties` の `sdk.dir`。
 `./gradlew testDebugUnitTest assembleDebug` で検証。
@@ -31,7 +31,7 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 - `allowBackup=true` + `data_extraction_rules.xml` (API31+) / `backup_rules.xml` (〜API30): DB と `datastore/` を含める (NFR-200)。
 - FileProvider: `${applicationId}.fileprovider`、`cache/exports/` のみ。
 
-## R8 (release) 保持ルールの確認 (T-05 配線時)
+## R8 (release) 保持ルールの確認
 結論: **追加の proguard ルールは不要** (`proguard-rules.pro` は空のまま)。ライブラリ同梱の consumer rules で足りることを
 `app/build/outputs/mapping/release/{seeds,mapping,configuration}.txt` で確認した (assembleRelease、2026-11-23)。
 
@@ -54,11 +54,11 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 | lintDebug | **失敗 (1 error / 12 warnings)** |
 
 ### lint の内容
-- **Error 1 件 (要対応・android-ui 担当)**: `src/test/.../ui/edit/AttackEditScreenTest.kt:41` `UnrememberedMutableState`。
+- **Error 1 件 (のち解消済み)**: `src/test/.../ui/edit/AttackEditScreenTest.kt:41` `UnrememberedMutableState`。
   `setContent { var s by mutableStateOf(initial) ... }` を `remember { mutableStateOf(initial) }` にすれば解消。テストコードのみで製品コードへの影響なし。
-  (lint はテストソースも対象のため `lintDebug` が非 0 終了になる。修正されるまで CI 等で lint をゲートにしないこと)
+  (lint はテストソースも対象のため `lintDebug` が非 0 終了になる。現在は修正済み)
 - Warning 12 件 (対処任意):
-  - InlinedApi 2: `POST_NOTIFICATIONS` (API33+) を参照 (`AttackEditScreen.kt:118`, `SettingsScreen.kt:148`)。要求側で SDK_INT 判定済みなら問題なし (android-ui が確認)。
+  - InlinedApi 2: `POST_NOTIFICATIONS` (API33+) を参照 (`AttackEditScreen.kt:118`, `SettingsScreen.kt:148`)。要求側で SDK_INT 判定済みなら問題なし。
   - OldTargetApi 1: targetSdk 36 (最新は 37 系)。Play 要件は 36 以上で満たす。37 へは挙動変更の検証後に上げる。
   - UnusedResources 4: `action_close`, `placeholder_coming_soon`, `stats_monthly_empty`, `export_pdf_count_suffix`。
   - MonochromeLauncherIcon 1: アダプティブアイコンに monochrome 未指定 (テーマアイコン非対応)。公開前にデザイン確定したら対応。
@@ -67,7 +67,7 @@ Ktor は Android 向けにエンジン/プラグイン構成が増えるため�
 ### 検証していないこと
 実機/エミュレータでの起動・操作、release APK の実行、バックアップ復元。debug APK は実機への手動インストール用 (`adb install -r app/build/outputs/apk/debug/app-debug.apk`)。
 
-## 最終確認 T-15 (HEAD 88a0737 / 2026-11-24)
+## リリース前確認 (HEAD 88a0737)
 検証対象: **`git archive 88a0737` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。
 `./gradlew --no-parallel --max-workers=2` でタスクを 1 つずつ実行。
 
@@ -89,52 +89,52 @@ versionName `0.1.0` / versionCode `1`。
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
 
-## 最終確認 T-15b (HEAD 207f7e8 / android-data のログ方針修正まで)
+## リリース前確認 (HEAD 207f7e8)
 検証対象: **`git archive 207f7e8` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2` で 1 タスクずつ。versionName `0.1.0` / versionCode `1` のまま。
 
 | タスク | 結果 |
 | --- | --- |
 | testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
-| lintDebug | 成功 (0 errors / 6 warnings: MonochromeLauncherIcon 1, OldTargetApi 1, UnusedResources 1, UseKtx 3。T-15 と同じ内訳) |
+| lintDebug | 成功 (0 errors / 6 warnings: MonochromeLauncherIcon 1, OldTargetApi 1, UnusedResources 1, UseKtx 3。前回と同じ内訳) |
 | assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
 
 | 成果物 | サイズ | sha256 |
 | --- | --- | --- |
-| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-207f7e8-debug.apk`) | 16,512,017 B | `0352dde12a03da40507cb378098a41dbeee138f4e0c3ec48ad09c20c4b7ca3ff` |
+| app-debug.apk (`headache-diary-0.1.0-207f7e8-debug.apk`) | 16,512,017 B | `0352dde12a03da40507cb378098a41dbeee138f4e0c3ec48ad09c20c4b7ca3ff` |
 | app-release-unsigned.apk | 2,495,683 B | `21f28b1529d06ddb3cda836acdd13e75af7d982ed7df55d821f2fa66adc153f4` |
 | app-release.aab | 5,796,454 B | `95c6e9839235a843d65cc49b043d41b69638c89c8b61377a4d5ecd1ac75e3cf2` |
 
-未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。旧 88a0737 版 APK は `shared/artifacts/` に残してある。
+未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
 
-## 最終確認 T-15c (HEAD 046d7d1 / T-17 ナイキサン表記 + T-18 ランチャーアイコン)
+## リリース前確認 (HEAD 046d7d1)
 検証対象: **`git archive 046d7d1` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2`、versionName `0.1.0` / versionCode `1` のまま。
 
 | タスク | 結果 |
 | --- | --- |
 | testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
-| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。Monochrome が 1 件増えたのは T-18 のアイコン差し替えによる。T-18b の前景差し替え後に再確認) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。Monochrome が 1 件増えたのはアイコン差し替えによる) |
 | assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
 
 | 成果物 | サイズ | sha256 |
 | --- | --- | --- |
-| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-046d7d1-debug.apk`) | 16,629,680 B | `901c4c39912e203abd102e35d80b01d22ddbd8df5a94b264c971c3bac0afd1f9` |
+| app-debug.apk (`headache-diary-0.1.0-046d7d1-debug.apk`) | 16,629,680 B | `901c4c39912e203abd102e35d80b01d22ddbd8df5a94b264c971c3bac0afd1f9` |
 | app-release-unsigned.apk | 2,590,791 B | `11d6e7bd29b71134cb5c68324aee8f1e07094f2100e682f328f55847f8b78db9` |
 | app-release.aab | 5,890,853 B | `d1a50f214adf222400d569e0a94f985131c2b602df6fa12a433982ae4d08c15c` |
 
 未実施: 実機/エミュレータでの起動・操作、release の実行確認、バックアップ復元。
 
-## 最終確認 T-15d (HEAD 2731f30 / T-18b アイコン前景縮小まで)
+## リリース前確認 (HEAD 2731f30)
 検証対象: **`git archive 2731f30` を別ディレクトリに展開してビルド** (作業ツリーの未コミット編集は含まない)。`--no-parallel --max-workers=2`、versionName `0.1.0` / versionCode `1` のまま。
 
 | タスク | 結果 |
 | --- | --- |
 | testDebugUnitTest | 成功 (206 件 / 失敗 0 / skip 0) |
-| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。T-15c と同内訳) |
+| lintDebug | 成功 (0 errors / 7 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 3。前回と同内訳) |
 | assembleDebug / assembleRelease (R8) / bundleRelease | すべて成功 (release は署名なし) |
 
 | 成果物 | サイズ | sha256 |
 | --- | --- | --- |
-| app-debug.apk (`shared/artifacts/headache-diary-0.1.0-2731f30-debug.apk`) | 16,601,064 B | `b2e4c935a2cb7c479447641e82681107450f5a410a67647e8f1480fa9f50f925` |
+| app-debug.apk (`headache-diary-0.1.0-2731f30-debug.apk`) | 16,601,064 B | `b2e4c935a2cb7c479447641e82681107450f5a410a67647e8f1480fa9f50f925` |
 | app-release-unsigned.apk | 2,568,187 B | `049a4f75aa2ab83e0d23c05c4f24151d6e2b201312090d772f8176a4d2768ea1` |
 | app-release.aab | 5,868,051 B | `41f5de05f3d1298e8ec98fccc061b5757578825a493c5423954ecca01f6bf670` |
 

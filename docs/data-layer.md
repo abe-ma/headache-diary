@@ -1,4 +1,4 @@
-# データ層メモ (T-03)
+# データ層メモ
 - Room DB 名: `headache_diary.db` (`AppDatabase.NAME`)。version=1、スキーマは `app/schemas/` にコミット。
 - DataStore: `settings` → `files/datastore/settings.preferences_pb`。
 - WorkManager の DB は `androidx.work.workdb` (同じ database ドメイン)。バックアップ対象から外す:
@@ -7,7 +7,7 @@
   Room 側 WAL の取りこぼしを避けるため、DB 側は include 限定でなく workdb の exclude で対応する。(build 経由で反映)
 - プリセット薬 id は定義順 1 始まりで固定、自由入力は 1000 以上。プリセット追加は必ず末尾 (open 毎に INSERT OR IGNORE)。
 
-## 通知まわりの仕様メモ (T-13 レビュー判断)
+## 通知まわりの仕様メモ
 - 効果リマインドをオフ→オンにしたとき、直近 12 時間の未評価の発作で「有効な予約が無い」ものに再度予約する。
   そのため、すでに通知済みの発作でも 12 時間以内なら、オンに切り替え直すと再通知されうる (許容)。
 - 起動時の再予約 (NotifyBootstrap) の基準は「起動した時点から 12 時間以内に開始した未評価の発作」。
