@@ -358,7 +358,7 @@ class RoomRepositoriesTest {
         val dao = db.attackDao()
         val base = Instant.parse("2026-11-22T00:00:00Z")
         // A: 気圧あり・差なし (後から 24h 前が取れた)、B: 気圧も差もなし、C: 両方あり (上書きしない)、D: 31日より古い
-        val a = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.toEpochMilli(), severity = "MILD", pressureHpa = 1008.0))
+        val a = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.toEpochMilli(), severity = "MILD", pressureHpa = 1000.0))
         val b = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.plusSeconds(3600).toEpochMilli(), severity = "MILD", pressureHpa = null))
         val c = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.toEpochMilli(), severity = "MILD", pressureHpa = 999.0, pressureDeltaHpa = 5.0))
         val d = dao.insertAttack(io.github.abe_ma.headachediary.data.db.AttackEntity(startedAt = base.minus(java.time.Duration.ofDays(40)).toEpochMilli(), severity = "MILD", pressureHpa = null))
@@ -370,11 +370,56 @@ class RoomRepositoriesTest {
         val job = io.github.abe_ma.headachediary.data.work.PressureRefreshJob(pressure, db) { Instant.parse("2026-11-23T00:00:00Z") }
         job.run()
         suspend fun get(id: Long) = dao.observeAttack(id).first()!!.attack
-        assertEquals(1008.0, get(a).pressureHpa!!, 0.0) // 既存の気圧は維持
-        assertEquals(1008.0 - 1011.0, get(a).pressureDeltaHpa!!, 1e-9)
+        assertEquals(1000.0, get(a).pressureHpa!!, 0.0) // 既存の気圧は維持
+        assertEquals(1000.0 - 1011.0, get(a).pressureDeltaHpa!!, 1e-9)
         assertEquals(1002.0, get(b).pressureHpa!!, 0.0)
         assertEquals(1002.0 - 1005.0, get(b).pressureDeltaHpa!!, 1e-9)
         assertEquals(999.0, get(c).pressureHpa!!, 0.0); assertEquals(5.0, get(c).pressureDeltaHpa!!, 0.0) // 上書きしない
         assertNull(get(d).pressureHpa); assertNull(get(d).pressureDeltaHpa) // 31 日より前は対象外
+    }
+
+    private fun rawAttack(startedAt: Instant, hpa: Double?, delta: Double? = null) = io.github.abe_ma.headachediary.data.db.AttackEntity(
+        startedAt = startedAt.toEpochMilli(), severity = "MILD", pressureHpa = hpa, pressureDeltaHpa = delta,
+    )
+
+    @Test
+    fun FR_404_backfill_does_not_fill_delta_when_stored_pressure_differs_from_current_region() = runBlocking {
+        val dao = db.attackDao()
+        val base = Instant.parse("2026-11-22T00:00:00Z")
+        // 旧地域で保存した 1008.0。現在地域の p(t) は 1000.0 → 0.1 hPa を超えて不一致 → 差は埋めない
+        val id = dao.insertAttack(rawAttack(base, 1008.0))
+        pressure.points.value = listOf(PressurePoint(base, 1000.0), PressurePoint(base.minus(day), 1011.0))
+        pressure.lastFetched.value = now
+        io.github.abe_ma.headachediary.data.work.PressureRefreshJob(pressure, db) { Instant.parse("2026-11-23T00:00:00Z") }.run()
+        val a = dao.observeAttack(id).first()!!.attack
+        assertEquals(1008.0, a.pressureHpa!!, 0.0) // 保存済みの気圧は変えない
+        assertNull(a.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_backfill_tolerance_is_0_1_hpa_inclusive() = runBlocking {
+        val dao = db.attackDao()
+        val base = Instant.parse("2026-11-22T00:00:00Z")
+        val within = dao.insertAttack(rawAttack(base, 1000.1)) // 差 0.1 → 一致とみなす
+        val beyond = dao.insertAttack(rawAttack(base, 1000.2)) // 差 0.2 → 不一致
+        pressure.points.value = listOf(PressurePoint(base, 1000.0), PressurePoint(base.minus(day), 1011.0))
+        pressure.lastFetched.value = now
+        io.github.abe_ma.headachediary.data.work.PressureRefreshJob(pressure, db) { Instant.parse("2026-11-23T00:00:00Z") }.run()
+        assertEquals(1000.1 - 1011.0, dao.observeAttack(within).first()!!.attack.pressureDeltaHpa!!, 1e-9) // 保存済み値と 24h 前の差
+        assertNull(dao.observeAttack(beyond).first()!!.attack.pressureDeltaHpa)
+    }
+
+    @Test
+    fun FR_404_backfill_right_after_migration_fills_only_attacks_that_match_current_data() = runBlocking {
+        // v2→v3 直後: 既存の全発作は pressureDeltaHpa=null。地域変更なし (一致) は埋まり、データなし/不一致は null のまま。
+        val dao = db.attackDao()
+        val base = Instant.parse("2026-11-22T00:00:00Z")
+        val same = dao.insertAttack(rawAttack(base, 1000.0))
+        val noData = dao.insertAttack(rawAttack(base.minus(java.time.Duration.ofDays(3)), 1005.0)) // 現在データに無い時刻
+        pressure.points.value = listOf(PressurePoint(base, 1000.0), PressurePoint(base.minus(day), 1004.0))
+        pressure.lastFetched.value = now
+        io.github.abe_ma.headachediary.data.work.PressureRefreshJob(pressure, db) { Instant.parse("2026-11-23T00:00:00Z") }.run()
+        assertEquals(-4.0, dao.observeAttack(same).first()!!.attack.pressureDeltaHpa!!, 1e-9)
+        assertNull(dao.observeAttack(noData).first()!!.attack.pressureDeltaHpa)
     }
 }

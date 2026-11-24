@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.PressureFormat
 import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.Severity
 import java.time.ZoneId
@@ -39,11 +40,7 @@ internal fun formatHpa(v: Double?): String = v?.let { String.format(Locale.ROOT,
  * 前日との気圧差 (FR-404): 符号付き小数 1 桁 (+1.2 / -3.4 / 0.0)。四捨五入して 0.0 になる値は符号なし。欠損は [missing]。
  * 数式対策の ' 前置は文字列列 (薬名) のみで、この数値列には付けない。
  */
-internal fun formatDelta(v: Double?, missing: String): String {
-    if (v == null) return missing
-    val r = Math.round(v * 10) / 10.0
-    return if (r == 0.0) "0.0" else String.format(Locale.ROOT, "%+.1f", r)
-}
+internal fun formatDelta(v: Double?, missing: String): String = if (v == null) missing else PressureFormat.delta(v)
 
 /** 「薬名×2錠 (効果)」(FR-209: 単位つき)。薬名はそのまま (数式対策は CSV 側)。 */
 internal fun intakeText(name: String, count: Int, unit: String, effect: String) = "$name×$count$unit ($effect)"

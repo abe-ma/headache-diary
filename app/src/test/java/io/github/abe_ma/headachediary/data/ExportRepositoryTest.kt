@@ -259,6 +259,8 @@ class ExportRepositoryTest {
     fun FR_404_format_delta_rounding_and_signs() {
         fun f(v: Double?, m: String = "") = formatDelta(v, m)
         assertEquals("+0.1", f(0.06)); assertEquals("-0.1", f(-0.06)); assertEquals("0.0", f(0.049)); assertEquals("-", f(null, "-"))
+        // UI と共用の規則: 半端は絶対値の HALF_UP (対称)。-0.25 は -0.3、+0.25 は +0.3
+        assertEquals("-0.3", f(-0.25)); assertEquals("+0.3", f(0.25)); assertEquals("0.0", f(-0.0))
         assertEquals("+10.0", f(10.0)); assertEquals("-12.3", f(-12.34))
     }
 

@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Effect
 import io.github.abe_ma.headachediary.domain.MedicationUnit
+import io.github.abe_ma.headachediary.domain.PressureFormat
 import io.github.abe_ma.headachediary.domain.Severity
 import java.time.Instant
 import java.time.ZoneId
@@ -54,11 +55,7 @@ fun formatPressure(hpa: Double): String = String.format(Locale.JAPAN, "%.1f", hp
  * FR-404: 前日との気圧差を符号付き小数1桁で (例: `+1.2` / `-3.4` / `0.0`)。
  * 小数1桁に丸めて 0.0 になるものは符号なしの `0.0` にする (`-0.0` と出さない)。
  */
-fun formatPressureDelta(deltaHpa: Double): String {
-    val rounded = String.format(Locale.JAPAN, "%.1f", abs(deltaHpa))
-    if (rounded == "0.0") return "0.0"
-    return (if (deltaHpa < 0) "-" else "+") + rounded
-}
+fun formatPressureDelta(deltaHpa: Double): String = PressureFormat.delta(deltaHpa) // 規則は domain.PressureFormat に集約 (CSV/PDF と共用)
 
 /** 読み上げ用の前日差の向き。丸めて 0.0 なら「同じ」。 */
 enum class DeltaDirection { LOWER, HIGHER, SAME }
@@ -70,4 +67,4 @@ fun pressureDeltaDirection(deltaHpa: Double): DeltaDirection = when {
 }
 
 /** 差の大きさ (符号なし、小数1桁)。 */
-fun formatPressureDeltaMagnitude(deltaHpa: Double): String = String.format(Locale.JAPAN, "%.1f", abs(deltaHpa))
+fun formatPressureDeltaMagnitude(deltaHpa: Double): String = PressureFormat.magnitude(deltaHpa)

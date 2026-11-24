@@ -22,6 +22,7 @@ import io.github.abe_ma.headachediary.domain.PressureRepository
 import io.github.abe_ma.headachediary.domain.RefreshResult
 import java.time.Duration
 import java.time.Instant
+import kotlin.math.abs
 import java.util.concurrent.TimeUnit
 
 /** ジョブ本体 (Worker から切り離してテストする)。 */
@@ -48,14 +49,22 @@ class PressureRefreshJob(
         // 気圧が欠損、または前日との気圧差 (FR-404) が欠損している直近の発作を、取れるようになった分だけ埋める。
         dao.getMissingPressureSince(since).forEach { a ->
             val t = Instant.ofEpochMilli(a.startedAt)
-            val hpa = a.pressureHpa ?: pressure.pressureAt(t)
-            val delta = if (a.pressureDeltaHpa == null) PressureDelta.resolve(pressure, t, hpa) else null
+            val current = pressure.pressureAt(t) // 現在の登録地域の p(t)
+            val hpa = a.pressureHpa ?: current
+            // 差を埋めるのは、保存済みの気圧が現在地域の p(t) と 0.1 hPa 以内で一致するときだけ
+            // (地域変更後に p(t)=旧地域、p(t−24h)=新地域の無意味な差を作らない。v2→v3 更新直後の一斉補完も同様)。
+            val delta = if (a.pressureDeltaHpa == null && hpa != null && current != null && abs(hpa - current) <= SAME_PRESSURE_TOLERANCE_HPA) {
+                PressureDelta.resolve(pressure, t, hpa)
+            } else null
             if (hpa != a.pressureHpa || delta != null) dao.fillPressure(a.id, hpa, delta)
         }
     }
 
     companion object {
         const val BACKFILL_DAYS = 31L
+
+        /** 保存済みの気圧が現在地域の値と「同じ」とみなす許容差 (Open-Meteo は小数 1 桁)。 */
+        const val SAME_PRESSURE_TOLERANCE_HPA = 0.1 + 1e-9
 
         /** Result.retry() の上限 (指数バックオフ 15分〜)。超えたら次の日次実行に任せる。 */
         const val MAX_RETRIES = 4
