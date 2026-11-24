@@ -18,8 +18,8 @@ data class Attack(                                              // FR-200,201
     val startedAt: Instant,
     val severity: Severity,
     val pressureHpa: Double?,        // FR-104: 保存時の紐づけ。欠損可
-    val pressureDeltaHpa: Double? = null, // FR-404: 発作時 − 24時間前の気圧差 (hPa、マイナス=低下)。欠損可。UI は null を渡せば Repository が解決する
     val intakes: List<Intake>,
+    val pressureDeltaHpa: Double? = null, // FR-404: 発作時 − 24時間前の気圧差 (hPa、マイナス=低下)。欠損可。末尾配置 (位置引数の既存呼び出しを壊さないため)。UI は null を渡せば Repository が解決する
 )
 data class Intake(                                              // FR-203,204,205
     val id: Long,
