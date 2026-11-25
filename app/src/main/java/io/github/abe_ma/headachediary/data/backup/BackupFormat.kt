@@ -1,5 +1,6 @@
 package io.github.abe_ma.headachediary.data.backup
 
+import io.github.abe_ma.headachediary.domain.InputLimits
 import kotlinx.serialization.Serializable
 
 /**
@@ -13,16 +14,22 @@ object BackupFormat {
     const val MAX_BYTES = 20 * 1024 * 1024 // 読み込みの上限 (FR-606)
 }
 
-/** 悪意・誤りのあるファイル対策の上限 (超過・範囲外は CORRUPT で中止、DB 不変)。docs/data-layer.md に同じ値を記載。 */
+/**
+ * 悪意・誤りのあるファイル対策の上限。ファイル全体を拒否する (OUT_OF_RANGE) のは総件数 (発作・自由入力の薬) の超過のみで、
+ * 個々の値の範囲外は、その発作だけをスキップするか値だけを捨てる (FR-608)。docs/data-layer.md に同じ値を記載。
+ */
 object BackupLimits {
     const val MAX_ATTACKS = 100_000
-    const val MAX_INTAKES_PER_ATTACK = 20
+    const val MAX_INTAKES_PER_ATTACK = InputLimits.MAX_INTAKES_PER_ATTACK // 入力側と共通 (FR-608a)
     const val MAX_CUSTOM_MEDICATIONS = 1_000
-    const val MAX_MEDICATION_NAME_LENGTH = 100
+    const val MAX_MEDICATION_NAME_LENGTH = InputLimits.MAX_MEDICATION_NAME_LENGTH
 
-    /** 発作の開始日時: 2000-01-01T00:00Z 〜 (現在 + 1 日)。 */
+    /**
+     * 発作の開始日時: 2000-01-01T00:00Z 〜 2100-01-01T00:00Z (FR-608)。端末の時計ずれで未来の日時が入っていても読めるよう、
+     * 「現在 + 1 日」のような時計に依存した上限は持たない。範囲外の発作はスキップ (skippedInvalid)。
+     */
     const val MIN_STARTED_AT_MS = 946_684_800_000L
-    const val MAX_STARTED_AT_MARGIN_DAYS = 1L
+    const val MAX_STARTED_AT_MS = 4_102_444_800_000L
 
     const val MIN_PRESSURE_HPA = 300.0
     const val MAX_PRESSURE_HPA = 1200.0

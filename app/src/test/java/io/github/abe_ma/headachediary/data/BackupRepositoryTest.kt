@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import io.github.abe_ma.headachediary.data.backup.BackupFormat
+import io.github.abe_ma.headachediary.data.backup.BackupLimits
 import io.github.abe_ma.headachediary.data.backup.RoomBackupRepository
 import io.github.abe_ma.headachediary.data.catalog.StaticPrefectureRepository
 import io.github.abe_ma.headachediary.data.db.AppDatabase
@@ -230,9 +231,6 @@ class BackupRepositoryTest {
         assertInvalid({ bytes(full.copyOf(full.size / 2)) }, InvalidReason.CORRUPT)
         assertInvalid({ text("""{"format":"headache-diary-backup","formatVersion":1,"attacks":[{"startedAt":"x"}]}""") }, InvalidReason.CORRUPT)
         assertInvalid({ text("""{"format":"headache-diary-backup"}""") }, InvalidReason.CORRUPT) // バージョンなし
-        assertInvalid({ text(backup("""{"startedAt":1,"severity":"HUGE"}""")) }, InvalidReason.CORRUPT)
-        assertInvalid({ text(backup("""{"startedAt":1,"severity":"MILD","intakes":[{"medication":{"presetId":1},"tablets":0,"effect":"UNRATED"}]}""")) }, InvalidReason.CORRUPT)
-        assertInvalid({ text(backup("""{"startedAt":1,"severity":"MILD","intakes":[{"medication":{"presetId":1},"tablets":1,"effect":"???"}]}""")) }, InvalidReason.CORRUPT)
     }
 
     @Test
@@ -364,40 +362,113 @@ class BackupRepositoryTest {
     }
 
     @Test
-    fun FR_606_limits_on_counts_are_accepted_at_the_boundary_and_rejected_when_exceeded() = runBlocking {
+    fun FR_608_total_count_limits_reject_the_whole_file_as_out_of_range() = runBlocking {
         val one = """{"startedAt":1700000000000,"severity":"MILD"}"""
         assertAccepted(backup(List(100_000) { one }.joinToString(",")))
-        assertInvalid({ text(backup(List(100_001) { one }.joinToString(","))) }, InvalidReason.CORRUPT)
-        assertAccepted(backup(atk(intakes = inl(20))))
-        assertInvalid({ text(backup(atk(intakes = inl(21)))) }, InvalidReason.CORRUPT)
+        assertInvalid({ text(backup(List(100_001) { one }.joinToString(","))) }, InvalidReason.OUT_OF_RANGE)
         fun customs(n: Int) = (1..n).joinToString(",") { """{"name":"m$it"}""" }
         assertAccepted(backup("", root = ""","customMedications":[${customs(1000)}]"""))
-        assertInvalid({ text(backup("", root = ""","customMedications":[${customs(1001)}]""")) }, InvalidReason.CORRUPT)
+        assertInvalid({ text(backup("", root = ""","customMedications":[${customs(1001)}]""")) }, InvalidReason.OUT_OF_RANGE)
+    }
+
+    private suspend fun inspectValid(file: String): BackupInspection.Valid {
+        val b = env("v" + System.nanoTime())
+        try { return b.repo.inspect(text(file)) as BackupInspection.Valid } finally { b.close(); envs.remove(b) }
     }
 
     @Test
-    fun FR_606_limits_on_medication_name_length() = runBlocking {
-        val ok = "あ".repeat(100); val ng = "あ".repeat(101)
-        assertAccepted(backup("", root = ""","customMedications":[{"name":"$ok"}]"""))
-        assertInvalid({ text(backup("", root = ""","customMedications":[{"name":"$ng"}]""")) }, InvalidReason.CORRUPT)
-        assertAccepted(backup(atk(intakes = inl(1, med = """{"customName":"$ok"}"""))))
-        assertInvalid({ text(backup(atk(intakes = inl(1, med = """{"customName":"$ng"}""")))) }, InvalidReason.CORRUPT)
-        assertInvalid({ text(backup(atk(intakes = inl(1, med = """{"presetId":9999,"name":"$ng"}""")))) }, InvalidReason.CORRUPT)
+    fun FR_608_out_of_range_attacks_are_skipped_and_counted_not_the_whole_file() = runBlocking {
+        val tooMany = inl(21)
+        val bad = listOf(
+            atk(startedAt = 946_684_799_999L), atk(startedAt = 4_102_444_800_001L), // 開始日時の範囲外
+            atk(intakes = tooMany), // 服薬 21 件
+            atk(intakes = inl(1, tablets = 0)), atk(intakes = inl(1, tablets = 100)), atk(intakes = inl(1, tablets = -1)),
+            """{"startedAt":1700000000000,"severity":"HUGE"}""", // 不明な強さ
+            atk(intakes = """{"medication":{"presetId":1},"tablets":1,"effect":"???"}"""), // 不明な効果
+        )
+        val good = listOf(atk(startedAt = 1_700_000_000_000), atk(startedAt = 1_700_000_100_000, intakes = inl(20)))
+        val file = backup((bad + good).joinToString(","))
+        val v = inspectValid(file)
+        assertEquals(2, v.attackCount); assertEquals(2, v.newAttackCount); assertEquals(0, v.duplicateCount); assertEquals(bad.size, v.skippedInvalid)
+        assertEquals(Instant.ofEpochMilli(1_700_000_000_000), v.periodStart) // 期間も有効な発作だけ
+        val b = env("dst")
+        b.attack(1_650_000_000_000, "SEVERE", null, null) // 既存の記録は不変
+        val before = b.snapshot()
+        val r = b.repo.restore(text(file))
+        assertEquals(2, r.addedAttacks); assertEquals(0, r.skippedDuplicates); assertEquals(bad.size, r.skippedInvalid)
+        assertEquals(before.size + 2, b.snapshot().size); assertTrue(b.snapshot().containsAll(before))
     }
 
     @Test
-    fun FR_606_limits_on_started_at_pressure_delta_and_tablets() = runBlocking {
-        val now = Instant.parse("2026-11-25T01:02:03Z").toEpochMilli() // テストの repo の現在時刻
-        val day = 24 * 3600 * 1000L
-        assertAccepted(backup(atk(startedAt = 946_684_800_000L)))
-        assertInvalid({ text(backup(atk(startedAt = 946_684_799_999L))) }, InvalidReason.CORRUPT)
-        assertAccepted(backup(atk(startedAt = now + day)))
-        assertInvalid({ text(backup(atk(startedAt = now + day + 1))) }, InvalidReason.CORRUPT)
-        listOf("300.0", "1200.0").forEach { assertAccepted(backup(atk(extra = ""","pressureHpa":$it"""))) }
-        listOf("299.9", "1200.1", "0.0", "-5.0").forEach { v -> assertInvalid({ text(backup(atk(extra = ""","pressureHpa":$v"""))) }, InvalidReason.CORRUPT) }
-        listOf("150.0", "-150.0", "0.0").forEach { assertAccepted(backup(atk(extra = ""","pressureDeltaHpa":$it"""))) }
-        listOf("150.1", "-150.1").forEach { v -> assertInvalid({ text(backup(atk(extra = ""","pressureDeltaHpa":$v"""))) }, InvalidReason.CORRUPT) }
-        listOf(1, 99).forEach { assertAccepted(backup(atk(intakes = inl(1, tablets = it)))) }
-        listOf(0, 100, -1).forEach { t -> assertInvalid({ text(backup(atk(intakes = inl(1, tablets = t)))) }, InvalidReason.CORRUPT) }
+    fun FR_608_date_boundaries_are_inclusive_and_future_dates_from_a_skewed_clock_are_readable() = runBlocking {
+        listOf(946_684_800_000L, 4_102_444_800_000L, Instant.parse("2026-11-25T01:02:03Z").toEpochMilli() + 3 * 365 * 24 * 3600 * 1000L).forEach {
+            val v = inspectValid(backup(atk(startedAt = it)))
+            assertEquals("startedAt=$it", 1, v.attackCount); assertEquals(0, v.skippedInvalid)
+        }
+        listOf(946_684_799_999L, 4_102_444_800_001L, 0L, -1L).forEach {
+            val v = inspectValid(backup(atk(startedAt = it)))
+            assertEquals("startedAt=$it", 0, v.attackCount); assertEquals(1, v.skippedInvalid)
+        }
+    }
+
+    @Test
+    fun FR_608_pressure_and_delta_out_of_range_are_dropped_but_the_attack_is_kept() = runBlocking {
+        val b = env("dst")
+        fun a(t: Long, extra: String) = atk(startedAt = t, extra = extra)
+        val file = backup(listOf(
+            a(1_700_000_000_000, ""","pressureHpa":299.9,"pressureDeltaHpa":150.1"""),
+            a(1_700_000_001_000, ""","pressureHpa":1200.1,"pressureDeltaHpa":-150.1"""),
+            a(1_700_000_002_000, ""","pressureHpa":300.0,"pressureDeltaHpa":150.0"""),
+            a(1_700_000_003_000, ""","pressureHpa":1200.0,"pressureDeltaHpa":-150.0"""),
+        ).joinToString(","))
+        val r = b.repo.restore(text(file))
+        assertEquals(4, r.addedAttacks); assertEquals(0, r.skippedInvalid)
+        assertEquals(
+            listOf("1700000000000|MILD|null|null|", "1700000001000|MILD|null|null|", "1700000002000|MILD|300.0|150.0|", "1700000003000|MILD|1200.0|-150.0|"),
+            b.snapshot(),
+        )
+    }
+
+    @Test
+    fun FR_608_long_medication_names_are_truncated_to_100_characters_not_rejected() = runBlocking {
+        val ok = "あ".repeat(100); val ng = "い".repeat(101)
+        val b = env("dst")
+        val atks = listOf(
+            atk(startedAt = 1_700_000_000_000, intakes = inl(1, med = """{"customName":"$ng"}""")),
+            atk(startedAt = 1_700_000_001_000, intakes = inl(1, med = """{"presetId":9999,"name":"${"う".repeat(150)}"}""")),
+            atk(startedAt = 1_700_000_002_000, intakes = inl(1, med = """{"customName":"$ok"}""")),
+        ).joinToString(",")
+        val r = b.repo.restore(text(backup(atks, root = ""","customMedications":[{"name":"${"え".repeat(101)}"}]""")))
+        assertEquals(3, r.addedAttacks); assertEquals(0, r.skippedInvalid)
+        val names = b.db.medicationDao().getAll().filter { !it.isPreset }.map { it.name }
+        assertTrue(names.all { it.length <= 100 })
+        assertTrue(names.containsAll(listOf("い".repeat(100), "う".repeat(100), ok, "え".repeat(100))))
+    }
+
+    @Test
+    fun FR_608_input_limits_are_shared_between_ui_and_backup() {
+        assertEquals(io.github.abe_ma.headachediary.domain.InputLimits.MAX_INTAKES_PER_ATTACK, BackupLimits.MAX_INTAKES_PER_ATTACK)
+        assertEquals(io.github.abe_ma.headachediary.domain.InputLimits.MAX_MEDICATION_NAME_LENGTH, BackupLimits.MAX_MEDICATION_NAME_LENGTH)
+        assertEquals(20, BackupLimits.MAX_INTAKES_PER_ATTACK); assertEquals(100, BackupLimits.MAX_MEDICATION_NAME_LENGTH)
+    }
+
+    @Test
+    fun FR_608_maximum_values_the_app_can_create_always_roundtrip() = runBlocking {
+        val a = env("src")
+        val longName = "薬".repeat(100)
+        val custom = a.addCustom(longName)
+        a.db.medicationDao().getAll() // 100 文字の自由入力の薬
+        // 服薬 20 件・錠数 99・今日 (現在) の日時・端末の時計が進んだ状態の未来日時・気圧の端
+        val intakes = (1..20).map { Triple(if (it % 2 == 0) longName else "ロキソニン", 99, "UNRATED") }.toTypedArray()
+        a.attack(Instant.parse("2026-11-25T01:02:03Z").toEpochMilli(), "SEVERE", 1200.0, -150.0, *intakes)
+        a.attack(Instant.parse("2029-01-01T00:00:00Z").toEpochMilli(), "MILD", 300.0, 150.0, Triple(longName, 1, "NONE"))
+        val file = ByteArrayOutputStream().also { a.repo.write(it) }.toByteArray()
+        val b = env("dst")
+        val v = b.repo.inspect(ByteArrayInputStream(file)) as BackupInspection.Valid
+        assertEquals(2, v.attackCount); assertEquals(0, v.skippedInvalid)
+        val r = b.repo.restore(ByteArrayInputStream(file))
+        assertEquals(2, r.addedAttacks); assertEquals(0, r.skippedInvalid)
+        assertEquals(a.snapshot(), b.snapshot())
+        assertEquals(custom.name, longName)
     }
 }

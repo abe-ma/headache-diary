@@ -132,7 +132,7 @@ class RoomBackupRepository(
     }
 
     /** 検証して中身を返す。不正なら BackupException。DB は触らない。 */
-    private fun parse(input: InputStream): BackupFile {
+    private fun parse(input: InputStream): Parsed {
         val bytes = readLimited(input)
         val header = try {
             json.decodeFromStream(BackupHeader.serializer(), ByteArrayInputStream(bytes))
@@ -157,32 +157,44 @@ class RoomBackupRepository(
         } catch (e: java.io.IOException) {
             throw BackupException(InvalidReason.CORRUPT)
         }
-        validate(file)
-        return file
+        return sanitizeFile(file)
     }
 
-    /** 値の整合性と上限 (BackupLimits)。範囲外・上限超過は壊れた/不正なファイルとして CORRUPT。 */
-    private fun validate(f: BackupFile) {
-        fun bad(): Nothing = throw BackupException(InvalidReason.CORRUPT)
+    private class Parsed(val file: BackupFile, val skippedInvalid: Int)
+
+    /**
+     * 総件数の上限だけ全体拒否 (OUT_OF_RANGE)。個々の発作は検証して、範囲外 (開始日時・服薬の件数・錠数・強さ/効果の不明な値) は
+     * スキップして数える。気圧・気圧差が範囲外ならその値だけ捨てる。薬名は 100 文字に切り詰める (FR-608)。
+     */
+    private fun sanitizeFile(f: BackupFile): Parsed {
+        if (f.attacks.size > BackupLimits.MAX_ATTACKS) throw BackupException(InvalidReason.OUT_OF_RANGE)
+        if (f.customMedications.size > BackupLimits.MAX_CUSTOM_MEDICATIONS) throw BackupException(InvalidReason.OUT_OF_RANGE)
         val severities = Severity.entries.map { it.name }.toSet()
         val effects = Effect.entries.map { it.name }.toSet()
-        val maxStarted = now().plus(java.time.Duration.ofDays(BackupLimits.MAX_STARTED_AT_MARGIN_DAYS)).toEpochMilli()
-        fun nameOk(n: String?) = n == null || n.trim().length <= BackupLimits.MAX_MEDICATION_NAME_LENGTH
-        if (f.attacks.size > BackupLimits.MAX_ATTACKS) bad()
-        if (f.customMedications.size > BackupLimits.MAX_CUSTOM_MEDICATIONS) bad()
-        if (f.customMedications.any { !nameOk(it.name) }) bad()
+        fun cut(n: String?): String? = n?.trim()?.take(BackupLimits.MAX_MEDICATION_NAME_LENGTH)
+        fun cutRef(r: BackupMedicationRef) = BackupMedicationRef(r.presetId, cut(r.customName), cut(r.name))
+
+        val valid = ArrayList<BackupAttack>(f.attacks.size)
+        var skipped = 0
         for (a in f.attacks) {
-            if (a.severity !in severities) bad()
-            if (a.startedAt < BackupLimits.MIN_STARTED_AT_MS || a.startedAt > maxStarted) bad()
-            a.pressureHpa?.let { if (!it.isFinite() || it < BackupLimits.MIN_PRESSURE_HPA || it > BackupLimits.MAX_PRESSURE_HPA) bad() }
-            a.pressureDeltaHpa?.let { if (!it.isFinite() || abs(it) > BackupLimits.MAX_ABS_PRESSURE_DELTA_HPA) bad() }
-            if (a.intakes.size > BackupLimits.MAX_INTAKES_PER_ATTACK) bad()
-            for (i in a.intakes) {
-                if (i.effect !in effects) bad()
-                if (i.tablets < BackupLimits.MIN_TABLETS || i.tablets > BackupLimits.MAX_TABLETS) bad()
-                if (!nameOk(i.medication.customName) || !nameOk(i.medication.name)) bad()
-            }
+            val ok = a.severity in severities &&
+                a.startedAt in BackupLimits.MIN_STARTED_AT_MS..BackupLimits.MAX_STARTED_AT_MS &&
+                a.intakes.size <= BackupLimits.MAX_INTAKES_PER_ATTACK &&
+                a.intakes.all { it.effect in effects && it.tablets in BackupLimits.MIN_TABLETS..BackupLimits.MAX_TABLETS }
+            if (!ok) { skipped++; continue }
+            valid += BackupAttack(
+                startedAt = a.startedAt, severity = a.severity,
+                pressureHpa = a.pressureHpa?.takeIf { it.isFinite() && it >= BackupLimits.MIN_PRESSURE_HPA && it <= BackupLimits.MAX_PRESSURE_HPA },
+                pressureDeltaHpa = a.pressureDeltaHpa?.takeIf { it.isFinite() && abs(it) <= BackupLimits.MAX_ABS_PRESSURE_DELTA_HPA },
+                intakes = a.intakes.map { BackupIntake(cutRef(it.medication), it.tablets, it.effect) },
+            )
         }
+        val customs = f.customMedications.map { BackupCustomMedication(cut(it.name) ?: "", it.unit) }.filter { it.name.isNotEmpty() }
+        val visibility = f.medicationVisibility.map { BackupVisibility(it.presetId, cut(it.customName), it.hidden) }
+        return Parsed(
+            BackupFile(f.format, f.formatVersion, f.exportedAt, f.appVersion, valid, customs, visibility, f.settings),
+            skipped,
+        )
     }
 
     // ---------------- 薬の参照解決と重複判定 ----------------
@@ -227,11 +239,12 @@ class RoomBackupRepository(
     // ---------------- inspect / restore ----------------
 
     override suspend fun inspect(input: InputStream): BackupInspection = withContext(io) {
-        val file = try {
+        val parsed = try {
             parse(input)
         } catch (e: BackupException) {
             return@withContext BackupInspection.Invalid(e.reason)
         }
+        val file = parsed.file
         val meds = loadMeds()
         val keys = existingKeys()
         var dup = 0
@@ -246,11 +259,13 @@ class RoomBackupRepository(
             customMedicationCount = newMedicationNames(file, meds).size,
             includesSettings = file.settings != null,
             exportedAt = Instant.ofEpochMilli(file.exportedAt), appVersion = file.appVersion,
+            skippedInvalid = parsed.skippedInvalid,
         )
     }
 
     override suspend fun restore(input: InputStream): RestoreResult = withContext(io) {
-        val file = parse(input)
+        val parsed = parse(input)
+        val file = parsed.file
         // 設定は先に検証・正規化 (DB のトランザクション後に失敗要因を残さない)。
         val restoredSettings = file.settings?.let { sanitize(it) }
 
@@ -262,7 +277,7 @@ class RoomBackupRepository(
             val meds = loadMeds()
             // 1) 自由入力の薬を追加 (参照を解決できない薬を含む)。
             var nextId = maxOf((medDao.maxId() ?: 0L) + 1, CUSTOM_MEDICATION_ID_START)
-            val unitByName = file.customMedications.associate { it.name.trim() to parseUnit(it.unit) }
+            val unitByName = file.customMedications.associate { it.name to parseUnit(it.unit) }
             for (name in newMedicationNames(file, meds)) {
                 medDao.insert(MedicationEntity(nextId, name, null, isPreset = false, isHidden = false, unit = (unitByName[name] ?: MedicationUnit.TABLET).name))
                 meds.byName[name] = nextId
@@ -314,7 +329,7 @@ class RoomBackupRepository(
                 applied = false // 記録は統合済み。設定だけ反映できなかったことを結果で伝える
             }
         }
-        RestoreResult(added, skipped, addedMeds, settingsApplied = applied, notificationsTurnedOff = applied)
+        RestoreResult(added, skipped, addedMeds, settingsApplied = applied, notificationsTurnedOff = applied, skippedInvalid = parsed.skippedInvalid)
     }
 
     private class Sanitized(val prefectureCode: String?, val effectReminderDelayMinutes: Int, val dropThresholdHpa: Double, val dropNotifyTime: LocalTime)

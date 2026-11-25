@@ -32,6 +32,8 @@ sealed interface BackupInspection {
         val includesSettings: Boolean,
         val exportedAt: Instant,
         val appVersion: String,
+        /** 範囲外のため取り込まない発作の件数 (FR-608)。attackCount / newAttackCount / duplicateCount には含まない。 */
+        val skippedInvalid: Int = 0,
     ) : BackupInspection
 
     data class Invalid(val reason: InvalidReason) : BackupInspection
@@ -47,6 +49,8 @@ enum class InvalidReason {
     TOO_LARGE,
     /** 新しい形式バージョン (アプリの更新が必要) */
     UNSUPPORTED_VERSION,
+    /** 壊れてはいないが、内容が想定の範囲外 (発作の総件数が 10 万件超、自由入力の薬が 1,000 件超) */
+    OUT_OF_RANGE,
 }
 
 /** [BackupRepository.restore] が不正なファイルで投げる。 */
@@ -59,4 +63,6 @@ data class RestoreResult(
     val addedMedications: Int,
     val settingsApplied: Boolean,
     val notificationsTurnedOff: Boolean,
+    /** 範囲外のため取り込まなかった発作の件数 (FR-608)。 */
+    val skippedInvalid: Int = 0,
 )
