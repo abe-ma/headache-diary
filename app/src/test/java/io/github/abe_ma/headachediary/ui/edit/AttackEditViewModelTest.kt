@@ -5,6 +5,7 @@ import io.github.abe_ma.headachediary.data.fake.FakePressureRepository
 import io.github.abe_ma.headachediary.data.fake.FakeRepositories
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.PressurePoint
@@ -407,5 +408,25 @@ class AttackEditViewModelTest {
         val after = fakes.attacks.observeAttack(id).first()!!
         assertEquals(t1, after.startedAt)
         assertEquals(51.84, after.pressureDeltaHpa!!, 1e-6) // p(t1)=1144.0, p(t1-24h)=1092.16
+    }
+
+    @Test
+    fun FR608_服薬は20件までで21件目は追加されない() {
+        val vm = vm(FakeRepositories())
+        repeat(InputLimits.MAX_INTAKES_PER_ATTACK) { assertTrue(vm.uiState.value.canAddMedication); vm.addMedication(med) }
+        assertEquals(InputLimits.MAX_INTAKES_PER_ATTACK, vm.uiState.value.intakes.size)
+        assertFalse(vm.uiState.value.canAddMedication)
+        vm.addMedication(med) // 上限を超える追加は無視する
+        assertEquals(InputLimits.MAX_INTAKES_PER_ATTACK, vm.uiState.value.intakes.size)
+    }
+
+    @Test
+    fun FR608_服薬を削除すると再び追加できる() {
+        val vm = vm(FakeRepositories())
+        repeat(InputLimits.MAX_INTAKES_PER_ATTACK) { vm.addMedication(med) }
+        vm.removeIntake(vm.uiState.value.intakes.first().key)
+        assertTrue(vm.uiState.value.canAddMedication)
+        vm.addMedication(med)
+        assertEquals(InputLimits.MAX_INTAKES_PER_ATTACK, vm.uiState.value.intakes.size)
     }
 }

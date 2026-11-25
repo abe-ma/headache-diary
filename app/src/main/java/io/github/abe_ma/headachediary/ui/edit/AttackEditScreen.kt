@@ -65,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.ui.DeltaDirection
@@ -97,6 +98,7 @@ const val TAG_SEVERITY_REQUIRED = "severity_required"
 const val TAG_DELETE = "edit_delete"
 const val TAG_DELETE_CONFIRM = "edit_delete_confirm"
 const val TAG_ADD_MEDICATION = "edit_add_medication"
+const val TAG_INTAKES_LIMIT = "edit_intakes_limit"
 const val TAG_PICK_DATE = "edit_pick_date"
 const val TAG_PICK_TIME = "edit_pick_time"
 const val TAG_TIME_OK = "edit_time_ok"
@@ -226,7 +228,7 @@ fun AttackEditContent(
             if (!state.isNew && !state.isLoading) PressureInfoSection(state)
             // 既存記録の読み込み中は強さがまだ入っていないので、未選択の警告は出さない。
             SeveritySection(state.severity, showRequired = !state.isLoading && !state.notFound, onChange = onSeverityChange)
-            IntakeSection(state.intakes, onAddMedication, onRemoveIntake, onTabletsChange, onEffectChange)
+            IntakeSection(state.intakes, state.canAddMedication, onAddMedication, onRemoveIntake, onTabletsChange, onEffectChange)
             if (state.saveFailed) {
                 Text(stringResource(R.string.edit_save_failed), color = MaterialTheme.colorScheme.error)
             }
@@ -465,6 +467,7 @@ private fun SeveritySection(selected: Severity?, showRequired: Boolean, onChange
 @Composable
 private fun IntakeSection(
     intakes: List<IntakeDraft>,
+    canAdd: Boolean,
     onAdd: () -> Unit,
     onRemove: (Long) -> Unit,
     onTabletsChange: (Long, Int) -> Unit,
@@ -484,10 +487,20 @@ private fun IntakeSection(
         }
         FilledTonalButton(
             onClick = onAdd,
+            enabled = canAdd,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(TAG_ADD_MEDICATION),
         ) {
             Icon(Icons.Filled.Add, contentDescription = null)
             Text(stringResource(R.string.edit_add_medication), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
+        }
+        if (!canAdd) {
+            // 無効な理由を文字で示す (色だけに頼らない)。
+            Text(
+                stringResource(R.string.edit_intakes_limit, InputLimits.MAX_INTAKES_PER_ATTACK),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(TAG_INTAKES_LIMIT),
+            )
         }
     }
 }

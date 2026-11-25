@@ -100,6 +100,32 @@ class BackupScreenTest {
     }
 
     @Test
+    fun FR608_確認画面に範囲外のため読み込まない件数を出す_0件なら出さない() {
+        show(BackupUiState(phase = BackupPhase.RestoreConfirm(valid.copy(skippedInvalid = 4))))
+        rule.onNodeWithTag(TAG_BACKUP_CONFIRM_SKIPPED_INVALID).assertIsDisplayed()
+        rule.onNodeWithText("範囲外のため読み込まなかった記録: 4件").assertIsDisplayed()
+    }
+
+    @Test
+    fun FR608_確認画面は範囲外が0件なら表示しない() {
+        show(BackupUiState(phase = BackupPhase.RestoreConfirm(valid.copy(skippedInvalid = 0))))
+        rule.onNodeWithTag(TAG_BACKUP_CONFIRM_SKIPPED_INVALID).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR608_結果に範囲外のため読み込まなかった件数を出す() {
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(9, 3, 2, settingsApplied = true, notificationsTurnedOff = true, skippedInvalid = 2), includedSettings = true)))
+        rule.onNodeWithTag(TAG_BACKUP_RESULT_SKIPPED_INVALID).assertIsDisplayed()
+        rule.onNodeWithText("範囲外のため読み込まなかった記録: 2件").assertIsDisplayed()
+    }
+
+    @Test
+    fun FR608_結果は範囲外が0件なら表示しない() {
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(9, 3, 2, settingsApplied = true, notificationsTurnedOff = true), includedSettings = true)))
+        rule.onNodeWithTag(TAG_BACKUP_RESULT_SKIPPED_INVALID).assertDoesNotExist()
+    }
+
+    @Test
     fun FR607_結果に追加_スキップ_薬_設定_通知オフを出し_設定へ誘導する() {
         val calls = Calls()
         show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(9, 3, 2, settingsApplied = true, notificationsTurnedOff = true), includedSettings = true)), calls)
@@ -157,6 +183,7 @@ class BackupScreenTest {
             BackupError.CORRUPT to "ファイルが壊れているか、途中で切れています",
             BackupError.TOO_LARGE to "ファイルが大きすぎるため読み込めません",
             BackupError.UNSUPPORTED_VERSION to "新しいバージョンのアプリで作成されたファイルです。アプリを更新してください。",
+            BackupError.OUT_OF_RANGE to "ファイルは壊れていませんが、内容がこのアプリで読み込める範囲を超えています",
         )
         // setContent は 1 テストで 1 回しか呼べないので、状態を差し替えて種類ごとに確認する。
         var state by mutableStateOf(BackupUiState(phase = BackupPhase.Failed(BackupError.NOT_BACKUP, duringCreate = false)))
@@ -176,6 +203,19 @@ class BackupScreenTest {
         show(BackupUiState(phase = BackupPhase.Failed(BackupError.IO, duringCreate = true)))
         rule.onNodeWithText("作成できませんでした").assertIsDisplayed()
         rule.onNodeWithText("記録や設定は変更されていません。").assertDoesNotExist()
+    }
+
+    @Test
+    fun FR601_削除できず書きかけのファイルが残る可能性があるときは手で削除するよう案内する() {
+        show(BackupUiState(phase = BackupPhase.Failed(BackupError.IO, duringCreate = true, leftoverPossible = true)))
+        rule.onNodeWithTag(TAG_BACKUP_LEFTOVER).assertIsDisplayed()
+        rule.onNodeWithText("手で削除してください", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun FR601_削除できたときは残っている旨の案内を出さない() {
+        show(BackupUiState(phase = BackupPhase.Failed(BackupError.IO, duringCreate = true, leftoverPossible = false)))
+        rule.onNodeWithTag(TAG_BACKUP_LEFTOVER).assertDoesNotExist()
     }
 
     @Test

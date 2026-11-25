@@ -62,6 +62,9 @@ const val TAG_BACKUP_RESULT = "backup_result"
 const val TAG_BACKUP_RESULT_SETTINGS = "backup_result_settings"
 const val TAG_BACKUP_RESULT_SETTINGS_LINE = "backup_result_settings_line"
 const val TAG_BACKUP_ERROR = "backup_error"
+const val TAG_BACKUP_CONFIRM_SKIPPED_INVALID = "backup_confirm_skipped_invalid"
+const val TAG_BACKUP_RESULT_SKIPPED_INVALID = "backup_result_skipped_invalid"
+const val TAG_BACKUP_LEFTOVER = "backup_leftover"
 
 @Composable
 fun BackupScreen(onBack: () -> Unit, viewModel: BackupViewModel = hiltViewModel()) {
@@ -246,6 +249,13 @@ private fun RestoreConfirmDialog(
                     }
                     Text(stringResource(R.string.backup_confirm_new_duplicate, inspection.newAttackCount, inspection.duplicateCount))
                 }
+                // FR-608b: 範囲外のため取り込まない記録がある場合だけ表示する (0 件なら出さない)。
+                if (inspection.skippedInvalid > 0) {
+                    Text(
+                        stringResource(R.string.backup_confirm_skipped_invalid, inspection.skippedInvalid),
+                        modifier = Modifier.testTag(TAG_BACKUP_CONFIRM_SKIPPED_INVALID),
+                    )
+                }
                 Text(stringResource(R.string.backup_confirm_custom_meds, inspection.customMedicationCount))
                 Text(
                     stringResource(
@@ -278,6 +288,12 @@ private fun RestoreResultDialog(result: RestoreResult, includedSettings: Boolean
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.backup_result_added, result.addedAttacks))
                 Text(stringResource(R.string.backup_result_skipped, result.skippedDuplicates))
+                if (result.skippedInvalid > 0) {
+                    Text(
+                        stringResource(R.string.backup_result_skipped_invalid, result.skippedInvalid),
+                        modifier = Modifier.testTag(TAG_BACKUP_RESULT_SKIPPED_INVALID),
+                    )
+                }
                 Text(stringResource(R.string.backup_result_meds, result.addedMedications))
                 // 設定の扱いを3通りに区別する: 反映した / 含まれていたが反映できなかった / そもそも含まれていない。
                 Text(
@@ -319,6 +335,7 @@ private fun ErrorDialog(failed: BackupPhase.Failed, onClose: () -> Unit) {
             BackupError.CORRUPT -> R.string.backup_error_corrupt
             BackupError.TOO_LARGE -> R.string.backup_error_too_large
             BackupError.UNSUPPORTED_VERSION -> R.string.backup_error_unsupported_version
+            BackupError.OUT_OF_RANGE -> R.string.backup_error_out_of_range
             BackupError.IO -> R.string.backup_error_io
         },
     )
@@ -331,6 +348,10 @@ private fun ErrorDialog(failed: BackupPhase.Failed, onClose: () -> Unit) {
             Text(reason)
             // 読み込みの失敗は、何も変更していないことを伝える (FR-606)。
             if (!failed.duringCreate) Text(stringResource(R.string.backup_error_unchanged))
+            // 作成に失敗し、書きかけのファイルも削除できなかったときは、手で削除するよう伝える。
+            if (failed.duringCreate && failed.leftoverPossible) {
+                Text(stringResource(R.string.backup_error_leftover), modifier = Modifier.testTag(TAG_BACKUP_LEFTOVER))
+            }
         }
     }
 }

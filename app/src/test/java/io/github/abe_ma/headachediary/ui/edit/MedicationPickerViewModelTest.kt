@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import io.github.abe_ma.headachediary.data.fake.FakeRepositories
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.ui.MainDispatcherRule
@@ -74,5 +75,26 @@ class MedicationPickerViewModelTest {
         val created = vm.addCustom("まったく新しい薬")
         assertFalse(created.isPreset)
         assertEquals(created, vm.addCustom("まったく新しい薬"))
+    }
+
+    @Test
+    fun FR608_検索欄の入力は薬名の上限までに切り詰める() = runTest {
+        val fakes = FakeRepositories()
+        val vm = MedicationPickerViewModel(fakes.medications)
+        vm.uiState.test {
+            vm.setQuery("あ".repeat(150)) // 貼り付けを想定
+            val s = expectMostRecentItem()
+            assertEquals(InputLimits.MAX_MEDICATION_NAME_LENGTH, s.query.length)
+            assertEquals(InputLimits.MAX_MEDICATION_NAME_LENGTH, s.customName!!.length)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun FR608_自由入力の薬名は上限までで追加される() = runTest {
+        val fakes = FakeRepositories()
+        val vm = MedicationPickerViewModel(fakes.medications)
+        val med = vm.addCustom("  " + "い".repeat(150) + "  ")
+        assertEquals(InputLimits.MAX_MEDICATION_NAME_LENGTH, med.name.length)
     }
 }

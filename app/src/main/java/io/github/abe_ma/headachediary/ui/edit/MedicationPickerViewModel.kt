@@ -3,6 +3,7 @@ package io.github.abe_ma.headachediary.ui.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.MedicationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,10 +39,12 @@ class MedicationPickerViewModel @Inject constructor(
             MedicationPickerUiState(q, filtered, custom)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MedicationPickerUiState())
 
-    fun setQuery(value: String) = query.update { value }
+    /** FR-608a: 入力欄は薬名の上限までに制限する (貼り付けでも切り詰める)。 */
+    fun setQuery(value: String) = query.update { value.take(InputLimits.MAX_MEDICATION_NAME_LENGTH) }
 
     fun clearQuery() = query.update { "" }
 
     /** FR-203: 自由入力で追加 (同名は既存が返る)。 */
-    suspend fun addCustom(name: String): Medication = medicationRepository.addCustom(name)
+    suspend fun addCustom(name: String): Medication =
+        medicationRepository.addCustom(name.trim().take(InputLimits.MAX_MEDICATION_NAME_LENGTH))
 }

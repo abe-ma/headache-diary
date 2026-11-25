@@ -31,6 +31,8 @@ enum class BackupOperation { CREATING, INSPECTING, RESTORING }
 /** 失敗の種類。FR-606 の 4 つ + ファイルの読み書きができなかった場合。 */
 enum class BackupError {
     NOT_BACKUP, CORRUPT, TOO_LARGE, UNSUPPORTED_VERSION,
+    /** 壊れてはいないが、内容 (発作の総件数・自由入力の薬の数) がこのアプリの想定の範囲外。「壊れている」とは区別して伝える。 */
+    OUT_OF_RANGE,
     /** 保存先/選んだファイルを開けない、書き込みに失敗した、など。 */
     IO,
 }
@@ -49,8 +51,11 @@ sealed interface BackupPhase {
      * 含まれていたのに result.settingsApplied=false なら「設定を反映できなかった」と、「そもそも設定が無かった」を区別して表示する。
      */
     data class RestoreDone(val result: RestoreResult, val includedSettings: Boolean) : BackupPhase
-    /** [duringCreate]: 作成中の失敗か (読み込み系は「記録は変更されていません」を添える)。 */
-    data class Failed(val error: BackupError, val duringCreate: Boolean) : BackupPhase
+    /**
+     * [duringCreate]: 作成中の失敗か (読み込み系は「記録は変更されていません」を添える)。
+     * [leftoverPossible]: 作成の失敗後に保存先の書きかけのファイルを削除できなかった (手で削除してもらう案内を出す)。
+     */
+    data class Failed(val error: BackupError, val duringCreate: Boolean, val leftoverPossible: Boolean = false) : BackupPhase
 }
 
 /** 画面が一度だけ実行する SAF の起動要求。 */
@@ -124,21 +129,25 @@ class BackupViewModel internal constructor(
             } catch (e: Exception) {
                 e
             }
-            if (failure != null) deleteIncomplete(uri)
+            val leftover = failure != null && !deleteIncomplete(uri)
             _uiState.update {
-                it.copy(phase = if (failure == null) BackupPhase.CreateDone else BackupPhase.Failed(BackupError.IO, duringCreate = true))
+                it.copy(
+                    phase = if (failure == null) BackupPhase.CreateDone
+                    else BackupPhase.Failed(BackupError.IO, duringCreate = true, leftoverPossible = leftover),
+                )
             }
         }
     }
 
-    /** 作成の失敗時に保存先のファイルを削除する (T-21d)。削除に失敗しても握りつぶして続行する。 */
-    private suspend fun deleteIncomplete(uri: Uri) {
-        withContext(NonCancellable + io) {
-            try {
-                files.deleteQuietly(uri)
-            } catch (_: Exception) {
-                // 削除できなくても、失敗の表示は続ける。
-            }
+    /**
+     * 作成の失敗時に保存先のファイルを削除する (T-21d)。削除に失敗しても握りつぶして続行する。
+     * 戻り値: 削除できたか (false なら書きかけのファイルが残っている可能性がある)。
+     */
+    private suspend fun deleteIncomplete(uri: Uri): Boolean = withContext(NonCancellable + io) {
+        try {
+            files.deleteQuietly(uri)
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -215,6 +224,7 @@ class BackupViewModel internal constructor(
         InvalidReason.CORRUPT -> BackupError.CORRUPT
         InvalidReason.TOO_LARGE -> BackupError.TOO_LARGE
         InvalidReason.UNSUPPORTED_VERSION -> BackupError.UNSUPPORTED_VERSION
+        InvalidReason.OUT_OF_RANGE -> BackupError.OUT_OF_RANGE
     }
 
     /** キャンセルは握りつぶさず再スローし、それ以外の例外は Result にする。 */

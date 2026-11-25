@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.MedicationUnit
@@ -55,6 +56,9 @@ data class AttackEditUiState(
     val savedPressureHpa: Double? = null,
     val savedPressureDeltaHpa: Double? = null,
 ) {
+    /** FR-608a: 1 回の記録に追加できる服薬は [InputLimits.MAX_INTAKES_PER_ATTACK] 件まで。 */
+    val canAddMedication: Boolean get() = intakes.size < InputLimits.MAX_INTAKES_PER_ATTACK
+
     /** 日時を変えると保存時に気圧と前日差を取り直すので、表示中の値は古くなる。 */
     val isPressureStale: Boolean get() = savedStartedAt != null && savedStartedAt != startedAt
 
@@ -195,6 +199,8 @@ class AttackEditViewModel @Inject constructor(
 
     /** FR-203: 薬を服薬に追加。錠数 1、効果は未評価から始める。 */
     fun addMedication(medication: Medication) = mutate {
+        // FR-608a: 上限に達していたら追加しない (バックアップから復元できない記録を作らない)。
+        if (!it.canAddMedication) return@mutate it
         it.copy(intakes = it.intakes + IntakeDraft(nextKey++, 0L, medication, MIN_TABLETS, Effect.UNRATED))
     }
 

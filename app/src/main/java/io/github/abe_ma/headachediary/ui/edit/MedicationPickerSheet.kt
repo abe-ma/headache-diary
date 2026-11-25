@@ -31,10 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Medication
 import kotlinx.coroutines.launch
 
 const val TAG_PICKER_SEARCH = "picker_search"
+const val TAG_PICKER_NAME_LIMIT = "picker_name_limit"
 const val TAG_PICKER_CUSTOM = "picker_custom"
 fun pickerItemTag(id: Long) = "picker_item_$id"
 
@@ -71,8 +73,17 @@ fun MedicationPickerContent(
         Text(stringResource(R.string.picker_title), style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(
             value = state.query,
-            onValueChange = onQueryChange,
+            onValueChange = { onQueryChange(it.take(InputLimits.MAX_MEDICATION_NAME_LENGTH)) },
             singleLine = true,
+            supportingText = {
+                // 上限に達したときだけ理由を示す (FR-608a)。
+                if (state.query.length >= InputLimits.MAX_MEDICATION_NAME_LENGTH) {
+                    Text(
+                        stringResource(R.string.picker_name_limit, InputLimits.MAX_MEDICATION_NAME_LENGTH),
+                        modifier = Modifier.testTag(TAG_PICKER_NAME_LIMIT),
+                    )
+                }
+            },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             placeholder = { Text(stringResource(R.string.picker_search_hint)) },
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(TAG_PICKER_SEARCH),

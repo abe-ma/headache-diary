@@ -60,9 +60,10 @@ class BackupViewModelTest {
                 override fun close() = throw IOException("close failed")
             }
         }
-        override fun deleteQuietly(uri: Uri) {
+        override fun deleteQuietly(uri: Uri): Boolean {
             deleted += uri
             if (failDelete) throw SecurityException("cannot delete")
+            return true
         }
     }
 
@@ -202,6 +203,7 @@ class BackupViewModelTest {
                     InvalidReason.CORRUPT -> BackupError.CORRUPT
                     InvalidReason.TOO_LARGE -> BackupError.TOO_LARGE
                     InvalidReason.UNSUPPORTED_VERSION -> BackupError.UNSUPPORTED_VERSION
+                    InvalidReason.OUT_OF_RANGE -> BackupError.OUT_OF_RANGE
                 }
                 assertEquals(BackupPhase.Failed(expected, duringCreate = false), expectMostRecentItem().phase)
                 assertEquals(0, repo.restoreCount)
@@ -359,7 +361,8 @@ class BackupViewModelTest {
         val vm = vmWith(FailingWriteRepository(IOException("disk full")), files)
         vm.uiState.test {
             vm.onCreateDocumentResult(file)
-            assertEquals(BackupPhase.Failed(BackupError.IO, duringCreate = true), expectMostRecentItem().phase)
+            // 削除できなかったので、書きかけのファイルが残っている可能性を伝える
+            assertEquals(BackupPhase.Failed(BackupError.IO, duringCreate = true, leftoverPossible = true), expectMostRecentItem().phase)
             assertEquals(1, files.deleted.size) // 削除は試みた
             cancelAndIgnoreRemainingEvents()
         }
@@ -418,7 +421,7 @@ class BackupViewModelTest {
         val files = object : BackupFileAccess {
             override fun openInput(uri: Uri): InputStream = throw SecurityException("permission revoked")
             override fun openOutput(uri: Uri): OutputStream = throw SecurityException("permission revoked")
-            override fun deleteQuietly(uri: Uri) = Unit
+            override fun deleteQuietly(uri: Uri) = true
         }
         val vm = BackupViewModel(FakeBackupRepository(), files, main.dispatcher, clock, zone, SavedStateHandle())
         vm.uiState.test {

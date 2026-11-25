@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.Severity
 import io.github.abe_ma.headachediary.ui.theme.HeadacheDiaryTheme
@@ -248,5 +249,21 @@ class AttackEditScreenTest {
     fun FR404_日時を変えたら保存時に取り直す旨を表示する() {
         host(base.copy(isNew = false, severity = Severity.MILD, savedStartedAt = base.startedAt.minusSeconds(3600), savedPressureHpa = 1013.2, savedPressureDeltaHpa = -3.4))
         rule.onNodeWithTag(TAG_PRESSURE_STALE).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun FR608_服薬が上限なら追加ボタンを無効にして理由を表示する() {
+        val intakes = (1..InputLimits.MAX_INTAKES_PER_ATTACK).map { IntakeDraft(it.toLong(), 0, med, 1, Effect.UNRATED) }
+        host(base.copy(severity = Severity.MILD, intakes = intakes))
+        rule.onNodeWithTag(TAG_ADD_MEDICATION).performScrollTo().assertIsNotEnabled()
+        rule.onNodeWithTag(TAG_INTAKES_LIMIT).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("1回の記録に追加できる服薬は20件までです。").assertIsDisplayed()
+    }
+
+    @Test
+    fun FR608_服薬が上限未満なら追加ボタンは有効で理由は出ない() {
+        host(withIntake)
+        rule.onNodeWithTag(TAG_ADD_MEDICATION).performScrollTo().assertIsEnabled()
+        rule.onNodeWithTag(TAG_INTAKES_LIMIT).assertDoesNotExist()
     }
 }

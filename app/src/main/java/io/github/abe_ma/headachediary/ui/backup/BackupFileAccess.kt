@@ -21,8 +21,9 @@ interface BackupFileAccess {
     /**
      * 作成の途中で失敗したとき、保存先に中途半端なファイルが残らないよう、作成した文書を削除する (T-21d)。
      * 削除できなくても例外は投げない (呼び出し側は失敗を表示して続行する)。
+     * 戻り値: 削除できたか。false なら保存先に書きかけのファイルが残っている可能性がある。
      */
-    fun deleteQuietly(uri: Uri)
+    fun deleteQuietly(uri: Uri): Boolean
 }
 
 class ContentResolverBackupFileAccess @Inject constructor(
@@ -43,12 +44,13 @@ class ContentResolverBackupFileAccess @Inject constructor(
         } ?: throw FileNotFoundException("cannot open $uri")
     }
 
-    override fun deleteQuietly(uri: Uri) {
-        try {
+    override fun deleteQuietly(uri: Uri): Boolean {
+        return try {
             DocumentsContract.deleteDocument(context.contentResolver, uri)
         } catch (e: Exception) {
             // 保存先の名前や Uri は健康データの手がかりになりうるので、ログには例外クラス名だけを残す。
             Log.w(TAG, "could not delete incomplete backup: ${e.javaClass.simpleName}")
+            false
         }
     }
 

@@ -50,6 +50,7 @@
     <string name="edit_save_needs_severity">痛みの強さを選ぶと保存できます</string>
     <string name="edit_section_intakes">服薬</string>
     <string name="edit_intakes_empty">服薬の記録はありません</string>
+    <string name="edit_intakes_limit">1回の記録に追加できる服薬は%1$d件までです。</string>
     <string name="edit_add_medication">薬を追加</string>
     <string name="edit_remove_intake">%1$s を削除</string>
     <string name="edit_tablets_label">数量</string>
@@ -219,6 +220,7 @@
     <string name="backup_confirm_attacks_none">発作の記録: なし</string>
     <string name="backup_confirm_period">期間: %1$s 〜 %2$s</string>
     <string name="backup_confirm_new_duplicate">うち追加される記録: %1$d件、重複のため読み込まない記録: %2$d件</string>
+    <string name="backup_confirm_skipped_invalid">範囲外のため読み込まなかった記録: %1$d件</string>
     <string name="backup_confirm_custom_meds">自由入力した薬: %1$d件</string>
     <string name="backup_confirm_settings_included">設定: 含まれています。地域・通知の時間やしきい値などが、今の設定に上書きされます。通知のオン/オフは、読み込み後は必ずオフになります。</string>
     <string name="backup_confirm_settings_none">設定: 含まれていません</string>
@@ -227,6 +229,7 @@
     <string name="backup_result_title">読み込みが終わりました</string>
     <string name="backup_result_added">追加した発作の記録: %1$d件</string>
     <string name="backup_result_skipped">重複のため読み込まなかった記録: %1$d件</string>
+    <string name="backup_result_skipped_invalid">範囲外のため読み込まなかった記録: %1$d件</string>
     <string name="backup_result_meds">追加した薬: %1$d件</string>
     <string name="backup_result_settings_applied">設定: 読み込んだ設定を反映しました</string>
     <string name="backup_result_settings_failed">設定: 反映できませんでした。記録は読み込み済みで、設定は変更されていません。</string>
@@ -240,11 +243,14 @@
     <string name="backup_error_corrupt">ファイルが壊れているか、途中で切れています。</string>
     <string name="backup_error_too_large">ファイルが大きすぎるため読み込めません (上限 20MB)。</string>
     <string name="backup_error_unsupported_version">新しいバージョンのアプリで作成されたファイルです。アプリを更新してください。</string>
+    <string name="backup_error_out_of_range">ファイルは壊れていませんが、内容がこのアプリで読み込める範囲を超えています (記録や薬の数が多すぎます)。</string>
     <string name="backup_error_io">ファイルを開けない、または書き込めませんでした。保存先やファイルを変えてお試しください。</string>
+    <string name="backup_error_leftover">保存先に書きかけのファイルが残っている可能性があります。このファイルはバックアップとして使えません。保存先を開いて、手で削除してください。</string>
     <string name="backup_error_unchanged">記録や設定は変更されていません。</string>
     <string name="backup_error_close">閉じる</string>
 
     <!-- 薬選択 (FR-203, 206) -->
+    <string name="picker_name_limit">薬の名前は%1$d文字までです。</string>
     <string name="picker_title">薬を選ぶ</string>
     <string name="picker_search_hint">薬の名前を検索、または入力</string>
     <string name="picker_add_custom">「%1$s」を新しい薬として追加</string>
