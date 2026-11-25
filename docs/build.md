@@ -186,3 +186,30 @@ R8 保持ルールの再確認 (seeds / mapping): Worker (名前・`(Context, Wo
 
 実機確認: 署名付き release APK (HEAD 9d23463 のビルド) を実機にインストールし、起動と操作を確認済み (R8 縮小版の実行時確認を含む)。
 未実施: バックアップ復元。
+
+## v0.2.0 リリース前確認 (HEAD 2893854)
+検証対象: `git archive 2893854` を別ディレクトリに展開してビルド (作業ツリーの未コミット編集は含まない)。`./gradlew --no-parallel --max-workers=2` で 1 タスクずつ実行。署名情報は `-PkeystoreProperties=<絶対パス>` で場所だけ渡し、展開先にはコピーしていない。
+
+| タスク | 結果 |
+| --- | --- |
+| testDebugUnitTest | 成功 (333 件 / 失敗 0 / skip 0)。ビルドキャッシュなしでの再実行 (`--no-build-cache cleanTestDebugUnitTest`) でも 333 件成功。既定のテスト JVM ヒープで不安定になる兆候はなく、`testOptions` の変更は不要 |
+| lintDebug | 成功 (0 errors / 8 warnings: MonochromeLauncherIcon 2, OldTargetApi 1, UnusedResources 1, UseKtx 4) |
+| assembleDebug | 成功 (`headache-diary-0.2.0-debug.apk`、16,747,027 B、sha256 `f6df456b70498cd7b4f26cb95efe6a321852ad09ea9319820f6c3b09eb5077d2`) |
+| bundleRelease | 成功 (署名情報なしでビルドした `headache-diary-0.2.0-release.aab`、5,965,016 B、sha256 `efbd1e5ebf27684a86ff6cec00852d6f1d2c5d170df2c876c6523bf9d98f702b`。AAB は署名していない) |
+| assembleRelease (署名付き) | 成功 |
+
+### 署名付き release APK
+`headache-diary-0.2.0-release.apk` (versionName 0.2.0 / versionCode 2 を `aapt2 dump badging` で確認)
+
+| 項目 | 結果 |
+| --- | --- |
+| サイズ | 2,644,475 B |
+| sha256 (APK) | `762a939eed621c68f24f9d1c1ea0cc70e3f827bc8c7d4d4dda481c1ec8fdd7ab` |
+| apksigner verify | `Verifies`。v2: true / v3: true |
+| 署名者 | 1 名、`CN=abe-ma, C=JP`、RSA 2048 bit |
+| 証明書 SHA-256 | `aae0d2c8a825ab76e71734dcf8e117dff809de7fab6ad97afa73195b07bc7f8e` (v0.1.0 と同一) |
+| zipalign -c -P 16 -v 4 | `Verification successful` |
+
+証明書 SHA-256 が v0.1.0 と一致しているため、v0.1.0 からの上書き更新が可能 (versionCode 1 → 2)。
+
+未実施: v0.2.0 の実機での起動・操作、バックアップ復元。
