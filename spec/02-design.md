@@ -130,3 +130,26 @@ interface PrefectureRepository { fun all(): List<Prefecture> }
 - 通知: 効果リマインド・気圧低下とも既定オフ。ロック画面は公開版 (FR-506)。
 - 書き出し: CSV 末尾に Open-Meteo 帰属行 (FR-403)、PDF/CSV は薬名×数量+単位 (FR-209)。
 - 例外: UI 専用の Hilt モジュールは `ui/` に置く。
+
+## 7. バックアップと復元 (FR-600〜607)
+`domain` に追加する契約 (java.io の Stream のみに依存。Uri や ContentResolver は ui が扱う):
+```kotlin
+interface BackupRepository {
+    suspend fun write(out: OutputStream)                       // JSON を書き出す (close は呼び出し側)
+    suspend fun inspect(input: InputStream): BackupInspection  // 検証 + 統合のプレビュー。DB は変更しない
+    suspend fun restore(input: InputStream): RestoreResult     // 検証し、1 トランザクションで統合。失敗時は変更なし
+}
+sealed interface BackupInspection {
+    data class Valid(val attackCount: Int, val newAttackCount: Int, val duplicateCount: Int,
+        val periodStart: Instant?, val periodEnd: Instant?, val customMedicationCount: Int,
+        val includesSettings: Boolean, val exportedAt: Instant, val appVersion: String) : BackupInspection
+    data class Invalid(val reason: InvalidReason) : BackupInspection  // NOT_BACKUP / CORRUPT / TOO_LARGE / UNSUPPORTED_VERSION
+}
+data class RestoreResult(val addedAttacks: Int, val skippedDuplicates: Int, val addedMedications: Int,
+    val settingsApplied: Boolean, val notificationsTurnedOff: Boolean)
+```
+- ファイル: UTF-8 JSON。ルートに `format="headache-diary-backup"`、`formatVersion=1`、`exportedAt`、`appVersion`、`attacks[]`、`customMedications[]`、`medicationVisibility[]`、`settings`。服薬の薬は `{presetId}` か `{customName}` で参照 (端末ごとの自由入力の id は持ち出さない)。時刻は epoch ミリ秒。`kotlinx.serialization` (ignoreUnknownKeys=true)。
+- 重複判定: 開始日時 (ms)・痛みの強さ・服薬の (薬, 数量) の集合が同じ発作。既存を残す。
+- 上限: 読み込みファイルは 20MB まで。書き出しと読み込みはストリームで処理し、1 トランザクションで反映。
+- 設定の復元は `SettingsRepository.update` を通す (地域変更の即時取得フックが働く)。通知のオン/オフは常に false で復元。
+- 画面: 設定 > 「バックアップと復元」(作成 / 読み込み、注意書き)。SAF (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`) は ui が担当。
