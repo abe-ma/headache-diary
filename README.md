@@ -15,6 +15,16 @@
 ## 動作環境
 Android 8.0 (API 26) 以上。
 
+## インストール (APK)
+署名付きの APK を [Releases](https://github.com/abe-ma/headache-diary/releases) で配布しています。Google Play では配布していません。
+
+1. 最新の Release から `headache-diary-<バージョン>.apk` をダウンロードする (Android 8.0 以上)。
+2. 端末でファイルを開く。「この提供元のアプリのインストールを許可」を求められたら、使っているブラウザやファイルアプリに対して許可する。Play プロテクトの警告が出ることがありますが、「このまま インストール」を選べます。
+3. (任意) ダウンロードの確認: Release に載せた SHA-256 と、`sha256sum <APK>` の結果を比べる。署名は `apksigner verify --print-certs <APK>` で確認でき、証明書の SHA-256 は次のとおり: `aae0d2c8a825ab76e71734dcf8e117dff809de7fab6ad97afa73195b07bc7f8e`
+4. 更新: 同じ鍵で署名されているので、新しい APK をそのまま上書きインストールできます (記録は残ります)。署名が異なる APK (自分でビルドした debug 版など) からは上書きできません。
+
+このアプリは診断や治療を目的としたものではなく、無保証です ([LICENSE](LICENSE))。
+
 ## ビルド
 JDK 17 と Android SDK (platform 36 以降) が必要です。`local.properties` に `sdk.dir=<SDK のパス>` を書くか、`ANDROID_HOME` を設定してください。
 
@@ -28,7 +38,7 @@ JDK 17 と Android SDK (platform 36 以降) が必要です。`local.properties`
 - 仕様: [spec/01-requirements.md](spec/01-requirements.md)、設計: [spec/02-design.md](spec/02-design.md)
 - ビルド・検証記録: [docs/build.md](docs/build.md)、データ層メモ: [docs/data-layer.md](docs/data-layer.md)
 - 実機確認チェックリスト: [docs/device-checklist.md](docs/device-checklist.md)
-- プライバシーポリシー (ドラフト): [docs/privacy-policy.md](docs/privacy-policy.md)
+- プライバシーポリシー: [docs/privacy-policy.md](docs/privacy-policy.md)
 - 公開手順 (署名): [docs/release-signing.md](docs/release-signing.md)
 - 薬名の照合記録: [docs/medication-verification.md](docs/medication-verification.md)
 
