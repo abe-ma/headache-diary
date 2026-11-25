@@ -15,6 +15,7 @@ import io.github.abe_ma.headachediary.domain.MedicationUnit
 import io.github.abe_ma.headachediary.domain.PrefectureRepository
 import io.github.abe_ma.headachediary.domain.RestoreResult
 import io.github.abe_ma.headachediary.domain.Severity
+import io.github.abe_ma.headachediary.domain.SettingsLimits
 import io.github.abe_ma.headachediary.domain.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -33,6 +34,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.time.Instant
 import java.time.LocalTime
+import kotlin.math.abs
 
 /**
  * バックアップの作成・検証・統合 (FR-600〜607)。
@@ -159,13 +161,27 @@ class RoomBackupRepository(
         return file
     }
 
-    /** 値の整合性 (未知の強さ/効果、錠数 1 未満は壊れたファイル扱い)。 */
+    /** 値の整合性と上限 (BackupLimits)。範囲外・上限超過は壊れた/不正なファイルとして CORRUPT。 */
     private fun validate(f: BackupFile) {
+        fun bad(): Nothing = throw BackupException(InvalidReason.CORRUPT)
         val severities = Severity.entries.map { it.name }.toSet()
         val effects = Effect.entries.map { it.name }.toSet()
+        val maxStarted = now().plus(java.time.Duration.ofDays(BackupLimits.MAX_STARTED_AT_MARGIN_DAYS)).toEpochMilli()
+        fun nameOk(n: String?) = n == null || n.trim().length <= BackupLimits.MAX_MEDICATION_NAME_LENGTH
+        if (f.attacks.size > BackupLimits.MAX_ATTACKS) bad()
+        if (f.customMedications.size > BackupLimits.MAX_CUSTOM_MEDICATIONS) bad()
+        if (f.customMedications.any { !nameOk(it.name) }) bad()
         for (a in f.attacks) {
-            if (a.severity !in severities) throw BackupException(InvalidReason.CORRUPT)
-            for (i in a.intakes) if (i.effect !in effects || i.tablets < 1) throw BackupException(InvalidReason.CORRUPT)
+            if (a.severity !in severities) bad()
+            if (a.startedAt < BackupLimits.MIN_STARTED_AT_MS || a.startedAt > maxStarted) bad()
+            a.pressureHpa?.let { if (!it.isFinite() || it < BackupLimits.MIN_PRESSURE_HPA || it > BackupLimits.MAX_PRESSURE_HPA) bad() }
+            a.pressureDeltaHpa?.let { if (!it.isFinite() || abs(it) > BackupLimits.MAX_ABS_PRESSURE_DELTA_HPA) bad() }
+            if (a.intakes.size > BackupLimits.MAX_INTAKES_PER_ATTACK) bad()
+            for (i in a.intakes) {
+                if (i.effect !in effects) bad()
+                if (i.tablets < BackupLimits.MIN_TABLETS || i.tablets > BackupLimits.MAX_TABLETS) bad()
+                if (!nameOk(i.medication.customName) || !nameOk(i.medication.name)) bad()
+            }
         }
     }
 
@@ -285,7 +301,7 @@ class RoomBackupRepository(
             try {
                 settings.update {
                     it.copy(
-                        prefectureCode = restoredSettings.prefectureCode,
+                        prefectureCode = restoredSettings.prefectureCode ?: it.prefectureCode, // null/不正なら現在の地域を維持 (FR-605)
                         effectReminderEnabled = false, effectReminderDelayMinutes = restoredSettings.effectReminderDelayMinutes,
                         dropNotifyEnabled = false, dropThresholdHpa = restoredSettings.dropThresholdHpa,
                         dropNotifyTime = restoredSettings.dropNotifyTime,
@@ -303,11 +319,16 @@ class RoomBackupRepository(
 
     private class Sanitized(val prefectureCode: String?, val effectReminderDelayMinutes: Int, val dropThresholdHpa: Double, val dropNotifyTime: LocalTime)
 
-    /** ファイルの設定値を検証して正規化する (範囲外は既定値)。 */
+    /**
+     * ファイルの設定値を検証して正規化する。入力範囲は UI と同じ定数 (SettingsLimits)。範囲外は既定値。
+     * 地域が null または 47 都道府県コード外なら null (= 現在の地域を維持する)。
+     */
     private fun sanitize(s: BackupSettings): Sanitized {
         val code = s.prefectureCode?.takeIf { c -> prefectures.all().any { it.code == c } }
-        val delay = s.effectReminderDelayMinutes.takeIf { it in 1..24 * 60 } ?: 120
-        val threshold = s.dropThresholdHpa.takeIf { it.isFinite() && it > 0.0 && it <= 100.0 } ?: 6.0
+        val delay = s.effectReminderDelayMinutes.takeIf { it in SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES } ?: SettingsLimits.DEFAULT_EFFECT_DELAY_MINUTES
+        val threshold = s.dropThresholdHpa.takeIf {
+            it.isFinite() && it >= SettingsLimits.MIN_DROP_THRESHOLD_HPA && it <= SettingsLimits.MAX_DROP_THRESHOLD_HPA
+        } ?: SettingsLimits.DEFAULT_DROP_THRESHOLD_HPA
         val time = runCatching { LocalTime.parse(s.dropNotifyTime) }.getOrNull() ?: LocalTime.of(20, 0)
         return Sanitized(code, delay, threshold, time)
     }

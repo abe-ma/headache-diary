@@ -13,6 +13,24 @@ object BackupFormat {
     const val MAX_BYTES = 20 * 1024 * 1024 // 読み込みの上限 (FR-606)
 }
 
+/** 悪意・誤りのあるファイル対策の上限 (超過・範囲外は CORRUPT で中止、DB 不変)。docs/data-layer.md に同じ値を記載。 */
+object BackupLimits {
+    const val MAX_ATTACKS = 100_000
+    const val MAX_INTAKES_PER_ATTACK = 20
+    const val MAX_CUSTOM_MEDICATIONS = 1_000
+    const val MAX_MEDICATION_NAME_LENGTH = 100
+
+    /** 発作の開始日時: 2000-01-01T00:00Z 〜 (現在 + 1 日)。 */
+    const val MIN_STARTED_AT_MS = 946_684_800_000L
+    const val MAX_STARTED_AT_MARGIN_DAYS = 1L
+
+    const val MIN_PRESSURE_HPA = 300.0
+    const val MAX_PRESSURE_HPA = 1200.0
+    const val MAX_ABS_PRESSURE_DELTA_HPA = 150.0
+    const val MIN_TABLETS = 1
+    const val MAX_TABLETS = 99
+}
+
 /** 形式名とバージョンだけを先に読む (残りは読み飛ばし)。 */
 @Serializable
 internal class BackupHeader(val format: String? = null, val formatVersion: Int? = null)

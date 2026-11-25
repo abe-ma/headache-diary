@@ -83,7 +83,7 @@ class BackupRepositoryTest {
         a.attack(1_700_200_000_000, "MODERATE", 1000.0, 1.2, Triple("五苓散", 1, "SLIGHT"))
         a.db.medicationDao().setHidden(a.med("ロキソニン").id, true)
         a.db.medicationDao().setHidden(a.med("自由薬").id, true)
-        a.settings.update { it.copy(prefectureCode = "13", effectReminderEnabled = true, effectReminderDelayMinutes = 45, dropNotifyEnabled = true, dropThresholdHpa = 4.5, dropNotifyTime = LocalTime.of(7, 30)) }
+        a.settings.update { it.copy(prefectureCode = "13", effectReminderEnabled = true, effectReminderDelayMinutes = 60, dropNotifyEnabled = true, dropThresholdHpa = 4.5, dropNotifyTime = LocalTime.of(7, 30)) }
         return a
     }
 
@@ -99,7 +99,7 @@ class BackupRepositoryTest {
         assertFalse(meds.getValue("自由薬").isPreset); assertTrue(meds.getValue("自由薬").isHidden) // 自由入力の薬と非表示
         assertTrue(meds.getValue("ロキソニン").isHidden); assertFalse(meds.getValue("カロナール").isHidden)
         val s = b.base.observe().first()
-        assertEquals("13", s.prefectureCode); assertEquals(45, s.effectReminderDelayMinutes); assertEquals(4.5, s.dropThresholdHpa, 0.0)
+        assertEquals("13", s.prefectureCode); assertEquals(60, s.effectReminderDelayMinutes); assertEquals(4.5, s.dropThresholdHpa, 0.0)
         assertEquals(LocalTime.of(7, 30), s.dropNotifyTime)
         assertFalse(s.effectReminderEnabled); assertFalse(s.dropNotifyEnabled) // FR-605: 通知は常にオフ
     }
@@ -164,8 +164,8 @@ class BackupRepositoryTest {
     @Test
     fun FR_604_duplicates_inside_the_same_file_are_collapsed_and_intake_order_does_not_matter() = runBlocking {
         val b = env("dst")
-        val a1 = """{"startedAt":1000,"severity":"MILD","intakes":[{"medication":{"presetId":6},"tablets":1,"effect":"UNRATED"},{"medication":{"presetId":1},"tablets":2,"effect":"UNRATED"}]}"""
-        val a2 = """{"startedAt":1000,"severity":"MILD","intakes":[{"medication":{"presetId":1},"tablets":2,"effect":"EFFECTIVE"},{"medication":{"presetId":6},"tablets":1,"effect":"UNRATED"}]}"""
+        val a1 = """{"startedAt":1700000000000,"severity":"MILD","intakes":[{"medication":{"presetId":6},"tablets":1,"effect":"UNRATED"},{"medication":{"presetId":1},"tablets":2,"effect":"UNRATED"}]}"""
+        val a2 = """{"startedAt":1700000000000,"severity":"MILD","intakes":[{"medication":{"presetId":1},"tablets":2,"effect":"EFFECTIVE"},{"medication":{"presetId":6},"tablets":1,"effect":"UNRATED"}]}"""
         val r = b.repo.restore(text(backup("$a1,$a2")))
         assertEquals(1, r.addedAttacks); assertEquals(1, r.skippedDuplicates)
     }
@@ -192,9 +192,9 @@ class BackupRepositoryTest {
     @Test
     fun FR_605_pressure_values_are_restored_as_is_without_recalculation_and_out_of_range_settings_fall_back() = runBlocking {
         val b = env("dst")
-        val a = """{"startedAt":5000,"severity":"MILD","pressureHpa":1234.5,"pressureDeltaHpa":-9.9}"""
+        val a = """{"startedAt":1700000005000,"severity":"MILD","pressureHpa":1100.5,"pressureDeltaHpa":-9.9}"""
         b.repo.restore(text(backup(a, settings = """{"prefectureCode":"99","effectReminderDelayMinutes":-5,"dropThresholdHpa":-1.0,"dropNotifyTime":"25:99"}""")))
-        assertEquals(listOf("5000|MILD|1234.5|-9.9|"), b.snapshot())
+        assertEquals(listOf("1700000005000|MILD|1100.5|-9.9|"), b.snapshot())
         val s = b.base.observe().first()
         assertNull(s.prefectureCode); assertEquals(120, s.effectReminderDelayMinutes); assertEquals(6.0, s.dropThresholdHpa, 0.0); assertEquals(LocalTime.of(20, 0), s.dropNotifyTime)
     }
@@ -260,7 +260,7 @@ class BackupRepositoryTest {
     @Test
     fun FR_606_unknown_fields_are_ignored() = runBlocking {
         val b = env("dst")
-        val a = """{"startedAt":7,"severity":"SEVERE","futureField":{"x":[1,2]},"intakes":[{"medication":{"presetId":1,"extra":1},"tablets":1,"effect":"NONE","note":"n"}]}"""
+        val a = """{"startedAt":1700000000007,"severity":"SEVERE","futureField":{"x":[1,2]},"intakes":[{"medication":{"presetId":1,"extra":1},"tablets":1,"effect":"NONE","note":"n"}]}"""
         val r = b.repo.restore(text(backup(a, root = ""","unknownRoot":[1,{"a":null}]""")))
         assertEquals(1, r.addedAttacks)
     }
@@ -268,7 +268,8 @@ class BackupRepositoryTest {
     @Test
     fun FR_606_unresolvable_medication_references_are_added_as_custom_medications() = runBlocking {
         val b = env("dst")
-        fun intake(ref: String) = """{"startedAt":${ref.hashCode()},"severity":"MILD","intakes":[{"medication":$ref,"tablets":1,"effect":"UNRATED"}]}"""
+        var seq = 0L
+        fun intake(ref: String) = """{"startedAt":${1_700_000_000_000 + 1000 * seq++},"severity":"MILD","intakes":[{"medication":$ref,"tablets":1,"effect":"UNRATED"}]}"""
         val atks = listOf(
             intake("""{"presetId":9999,"name":"将来のプリセット"}"""), // 解決不能 + 表示名 → 自由入力
             intake("""{"presetId":9998}"""), // 解決不能・名前なし → 不明な薬
@@ -319,4 +320,87 @@ class BackupRepositoryTest {
     private fun backup(attacks: String, root: String = "", settings: String? = null): String =
         """{"format":"headache-diary-backup","formatVersion":1,"exportedAt":1,"appVersion":"t","attacks":[$attacks]$root""" +
             (settings?.let { ""","settings":$it""" } ?: "") + "}"
+
+    // ---- T-21c: 地域の維持・設定の範囲・上限 ----
+    @Test
+    fun FR_605_null_or_invalid_region_in_file_keeps_current_region_and_valid_region_overrides() = runBlocking {
+        val b = env("dst")
+        b.settings.update { it.copy(prefectureCode = "27") }
+        b.repo.restore(text(backup("", settings = """{"prefectureCode":null}""")))
+        assertEquals("27", b.base.observe().first().prefectureCode)
+        b.repo.restore(text(backup("", settings = """{"prefectureCode":"99"}""")))
+        assertEquals("27", b.base.observe().first().prefectureCode)
+        assertTrue(b.regionChanges.size == 1) // 初期設定の 27 だけ (維持なので変更フックは増えない)
+        b.repo.restore(text(backup("", settings = """{"prefectureCode":"13"}""")))
+        assertEquals("13", b.base.observe().first().prefectureCode)
+    }
+
+    @Test
+    fun FR_605_settings_ranges_share_the_ui_constants_and_out_of_range_falls_back_to_defaults() = runBlocking {
+        // 定数が UI (SettingsViewModel) とずれていないこと
+        assertEquals(io.github.abe_ma.headachediary.ui.settings.MIN_DROP_THRESHOLD_HPA, io.github.abe_ma.headachediary.domain.SettingsLimits.MIN_DROP_THRESHOLD_HPA, 0.0)
+        assertEquals(io.github.abe_ma.headachediary.ui.settings.MAX_DROP_THRESHOLD_HPA, io.github.abe_ma.headachediary.domain.SettingsLimits.MAX_DROP_THRESHOLD_HPA, 0.0)
+        assertEquals(io.github.abe_ma.headachediary.ui.settings.EFFECT_DELAY_OPTIONS_MINUTES, io.github.abe_ma.headachediary.domain.SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES)
+        suspend fun restoreSettings(json: String): Settings {
+            val b = env("s" + System.nanoTime())
+            b.repo.restore(text(backup("", settings = json)))
+            return b.base.observe().first()
+        }
+        assertEquals(1.0, restoreSettings("""{"dropThresholdHpa":1.0}""").dropThresholdHpa, 0.0)
+        assertEquals(20.0, restoreSettings("""{"dropThresholdHpa":20.0}""").dropThresholdHpa, 0.0)
+        assertEquals(6.0, restoreSettings("""{"dropThresholdHpa":0.9}""").dropThresholdHpa, 0.0)
+        assertEquals(6.0, restoreSettings("""{"dropThresholdHpa":20.1}""").dropThresholdHpa, 0.0)
+        io.github.abe_ma.headachediary.domain.SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES.forEach {
+            assertEquals(it, restoreSettings("""{"effectReminderDelayMinutes":$it}""").effectReminderDelayMinutes)
+        }
+        assertEquals(120, restoreSettings("""{"effectReminderDelayMinutes":45}""").effectReminderDelayMinutes)
+    }
+
+    private fun atk(startedAt: Long = 1_700_000_000_000, extra: String = "", intakes: String = "") =
+        """{"startedAt":$startedAt,"severity":"MILD"$extra,"intakes":[$intakes]}"""
+    private fun inl(n: Int, tablets: Int = 1, med: String = """{"presetId":1}""") =
+        (1..n).joinToString(",") { """{"medication":$med,"tablets":$tablets,"effect":"UNRATED"}""" }
+
+    private suspend fun assertAccepted(file: String) {
+        val b = env("ok" + System.nanoTime())
+        try { assertTrue(file.take(200), b.repo.inspect(text(file)) is BackupInspection.Valid) } finally { b.close(); envs.remove(b) }
+    }
+
+    @Test
+    fun FR_606_limits_on_counts_are_accepted_at_the_boundary_and_rejected_when_exceeded() = runBlocking {
+        val one = """{"startedAt":1700000000000,"severity":"MILD"}"""
+        assertAccepted(backup(List(100_000) { one }.joinToString(",")))
+        assertInvalid({ text(backup(List(100_001) { one }.joinToString(","))) }, InvalidReason.CORRUPT)
+        assertAccepted(backup(atk(intakes = inl(20))))
+        assertInvalid({ text(backup(atk(intakes = inl(21)))) }, InvalidReason.CORRUPT)
+        fun customs(n: Int) = (1..n).joinToString(",") { """{"name":"m$it"}""" }
+        assertAccepted(backup("", root = ""","customMedications":[${customs(1000)}]"""))
+        assertInvalid({ text(backup("", root = ""","customMedications":[${customs(1001)}]""")) }, InvalidReason.CORRUPT)
+    }
+
+    @Test
+    fun FR_606_limits_on_medication_name_length() = runBlocking {
+        val ok = "あ".repeat(100); val ng = "あ".repeat(101)
+        assertAccepted(backup("", root = ""","customMedications":[{"name":"$ok"}]"""))
+        assertInvalid({ text(backup("", root = ""","customMedications":[{"name":"$ng"}]""")) }, InvalidReason.CORRUPT)
+        assertAccepted(backup(atk(intakes = inl(1, med = """{"customName":"$ok"}"""))))
+        assertInvalid({ text(backup(atk(intakes = inl(1, med = """{"customName":"$ng"}""")))) }, InvalidReason.CORRUPT)
+        assertInvalid({ text(backup(atk(intakes = inl(1, med = """{"presetId":9999,"name":"$ng"}""")))) }, InvalidReason.CORRUPT)
+    }
+
+    @Test
+    fun FR_606_limits_on_started_at_pressure_delta_and_tablets() = runBlocking {
+        val now = Instant.parse("2026-11-25T01:02:03Z").toEpochMilli() // テストの repo の現在時刻
+        val day = 24 * 3600 * 1000L
+        assertAccepted(backup(atk(startedAt = 946_684_800_000L)))
+        assertInvalid({ text(backup(atk(startedAt = 946_684_799_999L))) }, InvalidReason.CORRUPT)
+        assertAccepted(backup(atk(startedAt = now + day)))
+        assertInvalid({ text(backup(atk(startedAt = now + day + 1))) }, InvalidReason.CORRUPT)
+        listOf("300.0", "1200.0").forEach { assertAccepted(backup(atk(extra = ""","pressureHpa":$it"""))) }
+        listOf("299.9", "1200.1", "0.0", "-5.0").forEach { v -> assertInvalid({ text(backup(atk(extra = ""","pressureHpa":$v"""))) }, InvalidReason.CORRUPT) }
+        listOf("150.0", "-150.0", "0.0").forEach { assertAccepted(backup(atk(extra = ""","pressureDeltaHpa":$it"""))) }
+        listOf("150.1", "-150.1").forEach { v -> assertInvalid({ text(backup(atk(extra = ""","pressureDeltaHpa":$v"""))) }, InvalidReason.CORRUPT) }
+        listOf(1, 99).forEach { assertAccepted(backup(atk(intakes = inl(1, tablets = it)))) }
+        listOf(0, 100, -1).forEach { t -> assertInvalid({ text(backup(atk(intakes = inl(1, tablets = t)))) }, InvalidReason.CORRUPT) }
+    }
 }
