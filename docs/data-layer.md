@@ -31,4 +31,4 @@
 - 設定の復元 (通知のオン/オフは常にオフ): 値の範囲は UI と同じ定数 (`domain/SettingsLimits`。しきい値 1〜20 hPa、効果リマインドの遅延は選択肢 30/60/120/180/360 分)。範囲外は既定値 (6.0 hPa / 120 分 / 20:00)。
   **地域は、ファイルの値が null または 47 都道府県コード外なら現在の地域を維持**し、有効な値のときだけ上書きする (変わったら気圧を即時取得)。
 - 重複判定は (開始日時 ms, 痛みの強さ, 服薬の (薬, 数量) の集合)。気圧・気圧差はファイルの値のまま再計算しない。
-- UI 側の定数 (`ui/settings/SettingsViewModel`) は `SettingsLimits` と同じ値で、`BackupRepositoryTest` が一致を検証する。
+- 設定の範囲定数は `domain/SettingsLimits` に一元化し、UI (`ui/settings/SettingsViewModel`) も同じ定義を参照する (T-21d)。範囲を足すときは `SettingsLimits` に足す。
