@@ -137,7 +137,7 @@ interface PrefectureRepository { fun all(): List<Prefecture> }
 interface BackupRepository {
     suspend fun write(out: OutputStream)                       // JSON を書き出す (close は呼び出し側)
     suspend fun inspect(input: InputStream): BackupInspection  // 検証 + 統合のプレビュー。DB は変更しない
-    suspend fun restore(input: InputStream): RestoreResult     // 検証し、1 トランザクションで統合。失敗時は変更なし
+    suspend fun restore(input: InputStream): RestoreResult     // 検証し、1 トランザクションで統合。失敗時は変更なし。不正なファイルは BackupException(reason: InvalidReason) を投げる
 }
 sealed interface BackupInspection {
     data class Valid(val attackCount: Int, val newAttackCount: Int, val duplicateCount: Int,
