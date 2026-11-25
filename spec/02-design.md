@@ -146,7 +146,9 @@ sealed interface BackupInspection {
     data class Invalid(val reason: InvalidReason) : BackupInspection  // NOT_BACKUP / CORRUPT / TOO_LARGE / UNSUPPORTED_VERSION
 }
 data class RestoreResult(val addedAttacks: Int, val skippedDuplicates: Int, val addedMedications: Int,
-    val settingsApplied: Boolean, val notificationsTurnedOff: Boolean)
+    val settingsApplied: Boolean, val notificationsTurnedOff: Boolean,
+    val skippedInvalid: Int = 0)  // FR-608: 範囲外のため取り込まなかった発作の件数
+// BackupInspection.Valid にも skippedInvalid: Int = 0 を追加
 ```
 - ファイル: UTF-8 JSON。ルートに `format="headache-diary-backup"`、`formatVersion=1`、`exportedAt`、`appVersion`、`attacks[]`、`customMedications[]`、`medicationVisibility[]`、`settings`。服薬の薬は `{presetId}` か `{customName}` で参照 (端末ごとの自由入力の id は持ち出さない)。時刻は epoch ミリ秒。`kotlinx.serialization` (ignoreUnknownKeys=true)。
 - 重複判定: 開始日時 (ms)・痛みの強さ・服薬の (薬, 数量) の集合が同じ発作。既存を残す。
