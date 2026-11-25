@@ -30,19 +30,19 @@ keytool -genkeypair -v -keystore ~/.android-keys/headache-diary-release.jks \
 ./gradlew --no-parallel --max-workers=2 assembleRelease
 ```
 別ディレクトリ (`git archive` の展開物など) でビルドする場合は、`keystore.properties` をコピーせず場所だけ渡せる: `./gradlew -PkeystoreProperties=/絶対パス/keystore.properties assembleRelease`。
-出力: `app/build/outputs/apk/release/headache-diary-<versionName>-release.apk` (署名情報が無い場合は `...-release-unsigned.apk`) (例 `headache-diary-0.1.0-release.apk`)。
+出力: `app/build/outputs/apk/release/headache-diary-<versionName>-release.apk` (署名情報が無い場合は `...-release-unsigned.apk`) (例 `headache-diary-0.2.0-release.apk`)。
 配布時は GitHub Releases のアセット名を `headache-diary-<versionName>.apk` にしてもよい。versionName / versionCode は `app/build.gradle.kts` で更新する (更新インストールには versionCode の増加が必須)。
 
 ### 4. 署名の検証と証明書指紋の控え
 `apksigner` は Android SDK の build-tools にある (`$ANDROID_HOME/build-tools/<版>/apksigner`)。
 ```
 APKSIGNER=$ANDROID_HOME/build-tools/36.0.0/apksigner
-$APKSIGNER verify --verbose --print-certs app/build/outputs/apk/release/headache-diary-0.1.0-release.apk
+$APKSIGNER verify --verbose --print-certs app/build/outputs/apk/release/headache-diary-<versionName>-release.apk
 ```
 - `Verifies` と `Verified using v2 scheme: true` / `v3 scheme: true` を確認する。
 - 出力の `Signer #1 certificate SHA-256 digest` が**配布元の証明書指紋**。初回リリース時に控え (README やリリースノートに記載)、以後のリリースで同じ値であることを毎回確認する。鍵ファイルからも確認できる: `keytool -list -v -keystore ~/.android-keys/headache-diary-release.jks -alias headache-diary` (パスワードは対話入力)。
 - zipalign の確認: `$ANDROID_HOME/build-tools/36.0.0/zipalign -c -P 16 -v 4 <apk>` (16KB ページ境界のアラインを含む。`Verification successful` を確認)。
-- 配布物の sha256 も控える: `sha256sum headache-diary-0.1.0-release.apk` (リリースノートに記載すると利用者が検証できる)。
+- 配布物の sha256 も控える: `sha256sum headache-diary-<versionName>-release.apk` (リリースノートに記載すると利用者が検証できる)。
 
 ### 5. 利用者側の注意
 - 署名鍵が debug 版と異なるため、debug 版を入れた端末では一度アンインストールしないと release 版に更新できない (データは消える)。

@@ -10,7 +10,7 @@ plugins {
 
 // applicationId / namespace (確定値)。変更する場合はここと src 配下のパッケージディレクトリ・package 宣言を揃える。
 val appId = "io.github.abe_ma.headachediary"
-val appVersionName = "0.1.0"
+val appVersionName = "0.2.0"
 
 // release 署名情報 (Git 管理外)。app/keystore.properties (無ければ rootProject 直下) が存在するときだけ署名する。
 // 無ければ従来どおり署名なしでビルドが通る (CI / 他人のクローン向け)。雛形は keystore.properties.example。
@@ -28,7 +28,7 @@ if (keystoreFile != null) {
 }
 val hasReleaseSigning = keystoreFile != null
 
-// 出力名: headache-diary-<versionName>-<buildType>.apk (release 署名付きは headache-diary-0.1.0-release.apk)
+// 出力名: headache-diary-<versionName>-<buildType>.apk (release 署名付きは headache-diary-0.2.0-release.apk)
 base.archivesName.set("headache-diary-$appVersionName")
 
 android {
@@ -41,7 +41,7 @@ android {
         applicationId = appId
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
