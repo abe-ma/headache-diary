@@ -24,7 +24,10 @@ import io.github.abe_ma.headachediary.data.repo.NotifyAwareSettingsRepository
 import io.github.abe_ma.headachediary.data.work.PressureRefreshScheduler
 import io.github.abe_ma.headachediary.data.repo.RoomAttackRepository
 import io.github.abe_ma.headachediary.data.repo.RoomMedicationRepository
+import io.github.abe_ma.headachediary.BuildConfig
+import io.github.abe_ma.headachediary.data.backup.RoomBackupRepository
 import io.github.abe_ma.headachediary.domain.AttackRepository
+import io.github.abe_ma.headachediary.domain.BackupRepository
 import io.github.abe_ma.headachediary.domain.ExportRepository
 import io.github.abe_ma.headachediary.domain.MedicationRepository
 import io.github.abe_ma.headachediary.domain.PrefectureRepository
@@ -81,6 +84,13 @@ object DataModule {
         settings: SettingsRepository,
         reminders: ReminderScheduler,
     ): AttackRepository = RoomAttackRepository(db, pressure, settings, reminders)
+
+    @Provides @Singleton
+    fun backup(
+        db: AppDatabase,
+        settings: SettingsRepository,
+        prefectures: PrefectureRepository,
+    ): BackupRepository = RoomBackupRepository(db, settings, prefectures, BuildConfig.VERSION_NAME)
 
     @Provides @Singleton
     fun export(

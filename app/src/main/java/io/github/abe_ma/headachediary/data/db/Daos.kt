@@ -21,6 +21,14 @@ interface AttackDao {
     @Query("SELECT * FROM attack WHERE id = :id")
     suspend fun getAttack(id: Long): AttackEntity?
 
+    /** バックアップの作成・重複判定用 (全件)。 */
+    @Transaction
+    @Query("SELECT * FROM attack")
+    suspend fun getAllWithIntakes(): List<AttackWithIntakes>
+
+    @Insert suspend fun insertAttacks(a: List<AttackEntity>): List<Long>
+    @Insert suspend fun insertIntakes(i: List<IntakeEntity>)
+
     @Query("SELECT startedAt FROM attack WHERE startedAt >= :from")
     fun observeStartedAtSince(from: Long): Flow<List<Long>>
 
@@ -56,6 +64,9 @@ interface MedicationDao {
             "ORDER BY (SELECT COUNT(*) FROM intake WHERE intake.medicationId = medication.id) DESC, id ASC",
     )
     fun observeCandidates(): Flow<List<MedicationEntity>>
+
+    @Query("SELECT * FROM medication ORDER BY id ASC")
+    suspend fun getAll(): List<MedicationEntity>
 
     @Query("SELECT * FROM medication ORDER BY id ASC")
     fun observeAll(): Flow<List<MedicationEntity>>
