@@ -380,7 +380,7 @@ class BackupRepositoryTest {
     fun FR_608_out_of_range_attacks_are_skipped_and_counted_not_the_whole_file() = runBlocking {
         val tooMany = inl(21)
         val bad = listOf(
-            atk(startedAt = 946_684_799_999L), atk(startedAt = 4_102_444_800_001L), // 開始日時の範囲外
+            atk(startedAt = -2_208_988_800_001L), atk(startedAt = 4_102_444_800_001L), // 開始日時の範囲外
             atk(intakes = tooMany), // 服薬 21 件
             atk(intakes = inl(1, tablets = 0)), atk(intakes = inl(1, tablets = 100)), atk(intakes = inl(1, tablets = -1)),
             """{"startedAt":1700000000000,"severity":"HUGE"}""", // 不明な強さ
@@ -401,11 +401,11 @@ class BackupRepositoryTest {
 
     @Test
     fun FR_608_date_boundaries_are_inclusive_and_future_dates_from_a_skewed_clock_are_readable() = runBlocking {
-        listOf(946_684_800_000L, 4_102_444_800_000L, Instant.parse("2026-11-25T01:02:03Z").toEpochMilli() + 3 * 365 * 24 * 3600 * 1000L).forEach {
+        listOf(-2_208_988_800_000L, 0L, 946_684_800_000L, 4_102_444_800_000L, Instant.parse("2026-11-25T01:02:03Z").toEpochMilli() + 3 * 365 * 24 * 3600 * 1000L).forEach {
             val v = inspectValid(backup(atk(startedAt = it)))
             assertEquals("startedAt=$it", 1, v.attackCount); assertEquals(0, v.skippedInvalid)
         }
-        listOf(946_684_799_999L, 4_102_444_800_001L, 0L, -1L).forEach {
+        listOf(-2_208_988_800_001L, 4_102_444_800_001L, Long.MIN_VALUE, Long.MAX_VALUE).forEach {
             val v = inspectValid(backup(atk(startedAt = it)))
             assertEquals("startedAt=$it", 0, v.attackCount); assertEquals(1, v.skippedInvalid)
         }

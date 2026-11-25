@@ -25,10 +25,10 @@ object BackupLimits {
     const val MAX_MEDICATION_NAME_LENGTH = InputLimits.MAX_MEDICATION_NAME_LENGTH
 
     /**
-     * 発作の開始日時: 2000-01-01T00:00Z 〜 2100-01-01T00:00Z (FR-608)。端末の時計ずれで未来の日時が入っていても読めるよう、
+     * 発作の開始日時: 1900-01-01T00:00Z 〜 2100-01-01T00:00Z (FR-608)。端末の時計ずれで未来の日時が入っていても読めるよう、
      * 「現在 + 1 日」のような時計に依存した上限は持たない。範囲外の発作はスキップ (skippedInvalid)。
      */
-    const val MIN_STARTED_AT_MS = 946_684_800_000L
+    const val MIN_STARTED_AT_MS = -2_208_988_800_000L // 1900-01-01T00:00Z (UI の日付ピッカーの既定下限に合わせる)
     const val MAX_STARTED_AT_MS = 4_102_444_800_000L
 
     const val MIN_PRESSURE_HPA = 300.0

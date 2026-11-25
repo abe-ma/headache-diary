@@ -171,7 +171,7 @@ class RoomBackupRepository(
         if (f.customMedications.size > BackupLimits.MAX_CUSTOM_MEDICATIONS) throw BackupException(InvalidReason.OUT_OF_RANGE)
         val severities = Severity.entries.map { it.name }.toSet()
         val effects = Effect.entries.map { it.name }.toSet()
-        fun cut(n: String?): String? = n?.trim()?.take(BackupLimits.MAX_MEDICATION_NAME_LENGTH)
+        fun cut(n: String?): String? = n?.trim()?.take(BackupLimits.MAX_MEDICATION_NAME_LENGTH)?.trimEnd() // addCustom と同じ規則
         fun cutRef(r: BackupMedicationRef) = BackupMedicationRef(r.presetId, cut(r.customName), cut(r.name))
 
         val valid = ArrayList<BackupAttack>(f.attacks.size)

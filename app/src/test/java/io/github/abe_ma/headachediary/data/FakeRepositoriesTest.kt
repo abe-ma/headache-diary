@@ -298,4 +298,12 @@ class FakeRepositoriesTest {
         r.attacks.save(r.attacks.observeAttack(id).first()!!.copy(severity = Severity.SEVERE))
         assertNull(r.attacks.observeAttack(id).first()!!.pressureDeltaHpa)
     }
+
+    @Test
+    fun FR_608_fake_addCustom_truncates_names_like_room() = runTest {
+        val r = FakeRepositories()
+        val m = r.medications.addCustom("あ".repeat(150))
+        assertEquals(100, m.name.length)
+        assertEquals(m, r.medications.addCustom("あ".repeat(101)))
+    }
 }

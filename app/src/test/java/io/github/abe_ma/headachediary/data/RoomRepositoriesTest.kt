@@ -466,4 +466,17 @@ class RoomRepositoriesTest {
         val id = attacks.save(Attack(0, t0, Severity.MILD, 1008.0, emptyList()))
         assertNull(attacks.observeAttack(id).first()!!.pressureDeltaHpa)
     }
+
+    @Test
+    fun FR_608_addCustom_trims_and_truncates_names_to_the_input_limit() = runBlocking {
+        val limit = io.github.abe_ma.headachediary.domain.InputLimits.MAX_MEDICATION_NAME_LENGTH
+        val long = meds.addCustom("あ".repeat(limit + 50))
+        assertEquals(limit, long.name.length); assertEquals("あ".repeat(limit), long.name)
+        assertEquals(long, meds.addCustom("あ".repeat(limit + 1))) // 切り詰め後に同名 → 既存を返す
+        assertEquals("い".repeat(limit), meds.addCustom("  " + "い".repeat(limit) + "  ").name) // trim してから長さを判定
+        assertEquals("う".repeat(limit - 1), meds.addCustom("う".repeat(limit - 1) + " " + "x".repeat(10)).name) // 切り詰めで末尾が空白になれば除く
+        assertEquals(limit, meds.addCustom("え".repeat(limit)).name.length) // ちょうど上限はそのまま
+        assertTrue(runCatching { meds.addCustom("   ") }.exceptionOrNull() is IllegalArgumentException)
+        assertTrue(meds.observeAll().first().filter { !it.isPreset }.all { it.name.length <= limit })
+    }
 }

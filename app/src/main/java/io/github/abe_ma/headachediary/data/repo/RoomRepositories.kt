@@ -10,6 +10,7 @@ import io.github.abe_ma.headachediary.data.db.MedicationEntity
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.Effect
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Intake
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.MedicationRepository
@@ -50,7 +51,8 @@ class RoomMedicationRepository(private val db: AppDatabase) : MedicationReposito
     override suspend fun setHidden(id: Long, hidden: Boolean) = dao.setHidden(id, hidden)
 
     override suspend fun addCustom(name: String): Medication = db.withTransaction {
-        val trimmed = name.trim()
+        // 薬名は trim し、InputLimits の長さ (100 文字) に切り詰める (UI 以外の経路でも超えない。バックアップの復元と同じ規則)。
+        val trimmed = name.trim().take(InputLimits.MAX_MEDICATION_NAME_LENGTH).trimEnd()
         require(trimmed.isNotEmpty()) { "薬名が空です" }
         dao.findByName(trimmed)?.let {
             // 非表示の薬を明示的に入力した場合は再表示する (候補に出ないまま記録だけ作られるのを防ぐ)。

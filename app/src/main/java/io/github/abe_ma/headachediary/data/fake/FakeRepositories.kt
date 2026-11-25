@@ -7,6 +7,7 @@ import io.github.abe_ma.headachediary.data.repo.PressureDelta
 import io.github.abe_ma.headachediary.domain.Attack
 import io.github.abe_ma.headachediary.domain.AttackRepository
 import io.github.abe_ma.headachediary.domain.ExportRepository
+import io.github.abe_ma.headachediary.domain.InputLimits
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.MedicationRepository
 import io.github.abe_ma.headachediary.domain.MonthCount
@@ -51,7 +52,7 @@ class FakeMedicationRepository(
     }
 
     override suspend fun addCustom(name: String): Medication {
-        val trimmed = name.trim()
+        val trimmed = name.trim().take(InputLimits.MAX_MEDICATION_NAME_LENGTH).trimEnd() // Room 実装と同じ
         require(trimmed.isNotEmpty()) { "薬名が空です" }
         var result: Medication? = null
         medications.update { list ->
