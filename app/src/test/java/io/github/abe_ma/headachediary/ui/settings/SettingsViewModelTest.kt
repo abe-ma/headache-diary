@@ -2,6 +2,7 @@ package io.github.abe_ma.headachediary.ui.settings
 
 import app.cash.turbine.test
 import io.github.abe_ma.headachediary.data.fake.FakeRepositories
+import io.github.abe_ma.headachediary.domain.SettingsLimits
 import io.github.abe_ma.headachediary.ui.MainDispatcherRule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -60,7 +61,7 @@ class SettingsViewModelTest {
         val s = f.settings.observe().first()
         assertFalse(s.effectReminderEnabled)
         assertEquals(180, s.effectReminderDelayMinutes)
-        assertTrue(180 in EFFECT_DELAY_OPTIONS_MINUTES)
+        assertTrue(180 in SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES)
     }
 
     @Test
@@ -81,9 +82,9 @@ class SettingsViewModelTest {
         val f = FakeRepositories()
         val vm = vm(f)
         vm.changeDropThreshold(-100)
-        assertEquals(MIN_DROP_THRESHOLD_HPA, f.settings.observe().first().dropThresholdHpa, 0.0)
+        assertEquals(SettingsLimits.MIN_DROP_THRESHOLD_HPA, f.settings.observe().first().dropThresholdHpa, 0.0)
         vm.changeDropThreshold(+100)
-        assertEquals(MAX_DROP_THRESHOLD_HPA, f.settings.observe().first().dropThresholdHpa, 0.0)
+        assertEquals(SettingsLimits.MAX_DROP_THRESHOLD_HPA, f.settings.observe().first().dropThresholdHpa, 0.0)
     }
 
     @Test

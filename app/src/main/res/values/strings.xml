@@ -229,7 +229,8 @@
     <string name="backup_result_skipped">重複のため読み込まなかった記録: %1$d件</string>
     <string name="backup_result_meds">追加した薬: %1$d件</string>
     <string name="backup_result_settings_applied">設定: 読み込んだ設定を反映しました</string>
-    <string name="backup_result_settings_none">設定: 反映していません</string>
+    <string name="backup_result_settings_failed">設定: 反映できませんでした。記録は読み込み済みで、設定は変更されていません。</string>
+    <string name="backup_result_settings_none">設定: ファイルに含まれていないため、反映していません</string>
     <string name="backup_result_notifications_off">通知はオフになっています。使う場合は、設定の画面で有効にしてください。</string>
     <string name="backup_result_open_settings">設定に戻る</string>
     <string name="backup_result_close">閉じる</string>

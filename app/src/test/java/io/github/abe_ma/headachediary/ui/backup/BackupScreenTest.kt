@@ -102,7 +102,7 @@ class BackupScreenTest {
     @Test
     fun FR607_結果に追加_スキップ_薬_設定_通知オフを出し_設定へ誘導する() {
         val calls = Calls()
-        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(9, 3, 2, settingsApplied = true, notificationsTurnedOff = true))), calls)
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(9, 3, 2, settingsApplied = true, notificationsTurnedOff = true), includedSettings = true)), calls)
         rule.onNodeWithText("追加した発作の記録: 9件").assertIsDisplayed()
         rule.onNodeWithText("重複のため読み込まなかった記録: 3件").assertIsDisplayed()
         rule.onNodeWithText("追加した薬: 2件").assertIsDisplayed()
@@ -115,9 +115,39 @@ class BackupScreenTest {
 
     @Test
     fun FR607_設定を反映していないときは通知オフの案内を出さない() {
-        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(1, 0, 0, settingsApplied = false, notificationsTurnedOff = false))))
-        rule.onNodeWithText("設定: 反映していません").assertIsDisplayed()
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(1, 0, 0, settingsApplied = false, notificationsTurnedOff = false), includedSettings = false)))
+        rule.onNodeWithText("設定: ファイルに含まれていないため、反映していません").assertIsDisplayed()
         rule.onNodeWithTag(TAG_BACKUP_RESULT_SETTINGS).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR607_通知オフの表示はnotificationsTurnedOffだけで決め_設定を反映していても嘘を言わない() {
+        // 設定の反映に失敗した (settingsApplied=false) 場合は通知の状態を変えていないので、「通知はオフ」とは言わない
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(2, 0, 0, settingsApplied = false, notificationsTurnedOff = false), includedSettings = true)))
+        rule.onNodeWithText("通知はオフになっています", substring = true).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_BACKUP_RESULT_SETTINGS).assertDoesNotExist()
+    }
+
+    @Test
+    fun FR607_設定を含んでいたのに反映できなかったときは反映していないと区別して伝える() {
+        show(BackupUiState(phase = BackupPhase.RestoreDone(RestoreResult(5, 0, 0, settingsApplied = false, notificationsTurnedOff = false), includedSettings = true)))
+        rule.onNodeWithText("設定: 反映できませんでした。記録は読み込み済みで、設定は変更されていません。").assertIsDisplayed()
+        rule.onNodeWithText("設定: ファイルに含まれていないため、反映していません").assertDoesNotExist()
+    }
+
+    @Test
+    fun FR607_処理中は戻るボタンを無効にする() {
+        val calls = Calls()
+        show(BackupUiState(phase = BackupPhase.Working(BackupOperation.CREATING)), calls)
+        rule.onNodeWithTag(TAG_BACKUP_BACK).assertIsNotEnabled()
+    }
+
+    @Test
+    fun FR607_待機中は戻るボタンが使える() {
+        val calls = Calls()
+        show(BackupUiState(), calls)
+        rule.onNodeWithTag(TAG_BACKUP_BACK).assertIsEnabled().performClick()
+        assertEquals(1, calls.back)
     }
 
     @Test

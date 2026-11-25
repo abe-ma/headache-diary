@@ -13,6 +13,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.abe_ma.headachediary.data.catalog.StaticPrefectureRepository
 import io.github.abe_ma.headachediary.domain.Medication
 import io.github.abe_ma.headachediary.domain.Settings
+import io.github.abe_ma.headachediary.domain.SettingsLimits
 import io.github.abe_ma.headachediary.ui.theme.HeadacheDiaryTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -129,7 +130,7 @@ class SettingsScreenTest {
 
     @Test
     fun FR501_しきい値の下限では減らせない() {
-        show(Settings(null, dropNotifyEnabled = true, dropThresholdHpa = MIN_DROP_THRESHOLD_HPA))
+        show(Settings(null, dropNotifyEnabled = true, dropThresholdHpa = SettingsLimits.MIN_DROP_THRESHOLD_HPA))
         rule.onNodeWithTag(TAG_THRESHOLD_MINUS).performScrollTo().assertIsNotEnabled()
     }
 

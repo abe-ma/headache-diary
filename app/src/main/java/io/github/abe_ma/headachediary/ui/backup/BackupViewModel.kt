@@ -13,6 +13,7 @@ import io.github.abe_ma.headachediary.domain.RestoreResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,7 +44,11 @@ sealed interface BackupPhase {
     data object CreateDone : BackupPhase
     /** 検証済みの内容の確認 (FR-603)。「読み込む」を押すまで DB は変わらない。 */
     data class RestoreConfirm(val inspection: BackupInspection.Valid) : BackupPhase
-    data class RestoreDone(val result: RestoreResult) : BackupPhase
+    /**
+     * [includedSettings]: 確認画面の時点で、ファイルに設定が含まれていたか (inspect の includesSettings)。
+     * 含まれていたのに result.settingsApplied=false なら「設定を反映できなかった」と、「そもそも設定が無かった」を区別して表示する。
+     */
+    data class RestoreDone(val result: RestoreResult, val includedSettings: Boolean) : BackupPhase
     /** [duringCreate]: 作成中の失敗か (読み込み系は「記録は変更されていません」を添える)。 */
     data class Failed(val error: BackupError, val duringCreate: Boolean) : BackupPhase
 }
@@ -108,11 +113,31 @@ class BackupViewModel internal constructor(
         if (uri == null || _uiState.value.isWorking) return
         _uiState.update { it.copy(phase = BackupPhase.Working(BackupOperation.CREATING)) }
         viewModelScope.launch {
-            val failure = runCatchingNonCancellation {
+            val failure = try {
+                // use {} の close() の失敗 (最後の書き込みが保存先に渡らない) も失敗として扱う。
                 withContext(io) { files.openOutput(uri).use { backup.write(it) } }
-            }.exceptionOrNull()
+                null
+            } catch (e: CancellationException) {
+                // 画面を離れるなどで中断された場合も、中途半端なファイルを残さない。
+                deleteIncomplete(uri)
+                throw e
+            } catch (e: Exception) {
+                e
+            }
+            if (failure != null) deleteIncomplete(uri)
             _uiState.update {
                 it.copy(phase = if (failure == null) BackupPhase.CreateDone else BackupPhase.Failed(BackupError.IO, duringCreate = true))
+            }
+        }
+    }
+
+    /** 作成の失敗時に保存先のファイルを削除する (T-21d)。削除に失敗しても握りつぶして続行する。 */
+    private suspend fun deleteIncomplete(uri: Uri) {
+        withContext(NonCancellable + io) {
+            try {
+                files.deleteQuietly(uri)
+            } catch (_: Exception) {
+                // 削除できなくても、失敗の表示は続ける。
             }
         }
     }
@@ -151,7 +176,9 @@ class BackupViewModel internal constructor(
     /** 確認ダイアログで「読み込む」: ここで初めて反映する (restore は再検証し、失敗時は何も変更しない)。 */
     fun onRestoreConfirmed() {
         val uri = pendingRestoreUri
-        if (_uiState.value.phase !is BackupPhase.RestoreConfirm || uri == null) return
+        val confirm = _uiState.value.phase as? BackupPhase.RestoreConfirm
+        if (confirm == null || uri == null) return
+        val includedSettings = confirm.inspection.includesSettings
         _uiState.update { it.copy(phase = BackupPhase.Working(BackupOperation.RESTORING)) }
         viewModelScope.launch {
             val result = runCatchingNonCancellation {
@@ -159,7 +186,7 @@ class BackupViewModel internal constructor(
             }
             pendingRestoreUri = null
             val phase = result.fold(
-                onSuccess = { BackupPhase.RestoreDone(it) },
+                onSuccess = { BackupPhase.RestoreDone(it, includedSettings) },
                 onFailure = { BackupPhase.Failed(it.toError(), duringCreate = false) },
             )
             _uiState.update { it.copy(phase = phase) }

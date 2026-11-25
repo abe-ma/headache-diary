@@ -2,6 +2,8 @@ package io.github.abe_ma.headachediary.ui.backup
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -15,6 +17,12 @@ import javax.inject.Inject
 interface BackupFileAccess {
     fun openInput(uri: Uri): InputStream
     fun openOutput(uri: Uri): OutputStream
+
+    /**
+     * 作成の途中で失敗したとき、保存先に中途半端なファイルが残らないよう、作成した文書を削除する (T-21d)。
+     * 削除できなくても例外は投げない (呼び出し側は失敗を表示して続行する)。
+     */
+    fun deleteQuietly(uri: Uri)
 }
 
 class ContentResolverBackupFileAccess @Inject constructor(
@@ -23,7 +31,28 @@ class ContentResolverBackupFileAccess @Inject constructor(
     override fun openInput(uri: Uri): InputStream =
         context.contentResolver.openInputStream(uri) ?: throw FileNotFoundException("cannot open $uri")
 
-    // "wt": 既存ファイルを上書きするときに古い内容が残らないよう切り詰める。
-    override fun openOutput(uri: Uri): OutputStream =
-        context.contentResolver.openOutputStream(uri, "wt") ?: throw FileNotFoundException("cannot open $uri")
+    // "wt": 既存ファイルを上書きするときに古い内容が残らないよう切り詰める。保存先 (ドキュメントプロバイダ) によっては
+    // "wt" を受け付けず例外になるので、そのときは "w" でやり直す (作成直後の新しい文書なので切り詰めは不要)。
+    override fun openOutput(uri: Uri): OutputStream {
+        val resolver = context.contentResolver
+        return try {
+            resolver.openOutputStream(uri, "wt")
+        } catch (e: Exception) {
+            if (e is SecurityException) throw e // 権限がないときは再試行しても同じ
+            resolver.openOutputStream(uri, "w")
+        } ?: throw FileNotFoundException("cannot open $uri")
+    }
+
+    override fun deleteQuietly(uri: Uri) {
+        try {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        } catch (e: Exception) {
+            // 保存先の名前や Uri は健康データの手がかりになりうるので、ログには例外クラス名だけを残す。
+            Log.w(TAG, "could not delete incomplete backup: ${e.javaClass.simpleName}")
+        }
+    }
+
+    private companion object {
+        const val TAG = "BackupFileAccess"
+    }
 }

@@ -1,5 +1,6 @@
 package io.github.abe_ma.headachediary.ui.backup
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,6 +49,7 @@ import io.github.abe_ma.headachediary.ui.formatListDateTime
 import java.time.Instant
 import java.time.ZoneId
 
+const val TAG_BACKUP_BACK = "backup_back"
 const val TAG_BACKUP_CREATE = "backup_create"
 const val TAG_BACKUP_RESTORE = "backup_restore"
 const val TAG_BACKUP_PROGRESS = "backup_progress"
@@ -56,6 +60,7 @@ const val TAG_BACKUP_CONFIRM_CANCEL = "backup_confirm_cancel"
 const val TAG_BACKUP_CREATED = "backup_created"
 const val TAG_BACKUP_RESULT = "backup_result"
 const val TAG_BACKUP_RESULT_SETTINGS = "backup_result_settings"
+const val TAG_BACKUP_RESULT_SETTINGS_LINE = "backup_result_settings_line"
 const val TAG_BACKUP_ERROR = "backup_error"
 
 @Composable
@@ -106,12 +111,14 @@ fun BackupContent(
     now: Instant = Instant.now(),
 ) {
     val phase = state.phase
+    // 処理中 (作成・検証・反映) は戻る操作を無効にする。画面を離れると処理が中断され、中途半端な状態になりうるため。
+    BackHandler(enabled = state.isWorking) {}
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.backup_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.size(56.dp)) {
+                    IconButton(onClick = onBack, enabled = !state.isWorking, modifier = Modifier.size(56.dp).testTag(TAG_BACKUP_BACK)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
@@ -140,7 +147,8 @@ fun BackupContent(
 
             if (phase is BackupPhase.Working) {
                 Row(
-                    Modifier.testTag(TAG_BACKUP_PROGRESS).padding(top = 8.dp),
+                    // 進捗の開始・終了を TalkBack に伝える。
+                    Modifier.testTag(TAG_BACKUP_PROGRESS).padding(top = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -180,7 +188,7 @@ fun BackupContent(
             onClose = onDismiss,
         ) { Text(stringResource(R.string.backup_created_body)) }
         is BackupPhase.RestoreConfirm -> RestoreConfirmDialog(phase.inspection, zone, now, onConfirmRestore, onDismiss)
-        is BackupPhase.RestoreDone -> RestoreResultDialog(phase.result, onBack = onBack, onClose = onDismiss)
+        is BackupPhase.RestoreDone -> RestoreResultDialog(phase.result, phase.includedSettings, onBack = onBack, onClose = onDismiss)
         is BackupPhase.Failed -> ErrorDialog(phase, onClose = onDismiss)
         BackupPhase.Idle, is BackupPhase.Working -> Unit
     }
@@ -261,7 +269,7 @@ private fun RestoreConfirmDialog(
 
 /** FR-607: 結果 (追加/スキップ/薬/設定/通知オフ)。通知は権限が要るので、設定で有効にし直すよう案内する (FR-505)。 */
 @Composable
-private fun RestoreResultDialog(result: RestoreResult, onBack: () -> Unit, onClose: () -> Unit) {
+private fun RestoreResultDialog(result: RestoreResult, includedSettings: Boolean, onBack: () -> Unit, onClose: () -> Unit) {
     AlertDialog(
         onDismissRequest = onClose,
         modifier = Modifier.testTag(TAG_BACKUP_RESULT),
@@ -271,10 +279,16 @@ private fun RestoreResultDialog(result: RestoreResult, onBack: () -> Unit, onClo
                 Text(stringResource(R.string.backup_result_added, result.addedAttacks))
                 Text(stringResource(R.string.backup_result_skipped, result.skippedDuplicates))
                 Text(stringResource(R.string.backup_result_meds, result.addedMedications))
+                // 設定の扱いを3通りに区別する: 反映した / 含まれていたが反映できなかった / そもそも含まれていない。
                 Text(
                     stringResource(
-                        if (result.settingsApplied) R.string.backup_result_settings_applied else R.string.backup_result_settings_none,
+                        when {
+                            result.settingsApplied -> R.string.backup_result_settings_applied
+                            includedSettings -> R.string.backup_result_settings_failed
+                            else -> R.string.backup_result_settings_none
+                        },
                     ),
+                    modifier = Modifier.testTag(TAG_BACKUP_RESULT_SETTINGS_LINE),
                 )
                 if (result.notificationsTurnedOff) {
                     Text(stringResource(R.string.backup_result_notifications_off))

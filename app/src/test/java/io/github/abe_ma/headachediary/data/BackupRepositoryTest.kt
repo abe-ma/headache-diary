@@ -337,10 +337,7 @@ class BackupRepositoryTest {
 
     @Test
     fun FR_605_settings_ranges_share_the_ui_constants_and_out_of_range_falls_back_to_defaults() = runBlocking {
-        // 定数が UI (SettingsViewModel) とずれていないこと
-        assertEquals(io.github.abe_ma.headachediary.ui.settings.MIN_DROP_THRESHOLD_HPA, io.github.abe_ma.headachediary.domain.SettingsLimits.MIN_DROP_THRESHOLD_HPA, 0.0)
-        assertEquals(io.github.abe_ma.headachediary.ui.settings.MAX_DROP_THRESHOLD_HPA, io.github.abe_ma.headachediary.domain.SettingsLimits.MAX_DROP_THRESHOLD_HPA, 0.0)
-        assertEquals(io.github.abe_ma.headachediary.ui.settings.EFFECT_DELAY_OPTIONS_MINUTES, io.github.abe_ma.headachediary.domain.SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES)
+        // 範囲の定数は domain.SettingsLimits に一元化されていて、UI (SettingsViewModel / 設定画面) も同じものを参照する。
         suspend fun restoreSettings(json: String): Settings {
             val b = env("s" + System.nanoTime())
             b.repo.restore(text(backup("", settings = json)))

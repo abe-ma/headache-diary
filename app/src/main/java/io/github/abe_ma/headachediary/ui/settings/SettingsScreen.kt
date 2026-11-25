@@ -59,6 +59,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.domain.SettingsLimits
 import io.github.abe_ma.headachediary.ui.formatListDateTime
 import java.time.Instant
 import java.time.LocalTime
@@ -222,7 +223,7 @@ fun SettingsContent(
             if (s.effectReminderEnabled) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.settings_effect_delay_label), style = MaterialTheme.typography.bodyLarge)
-                    val options = (EFFECT_DELAY_OPTIONS_MINUTES + s.effectReminderDelayMinutes).distinct().sorted()
+                    val options = (SettingsLimits.EFFECT_DELAY_OPTIONS_MINUTES + s.effectReminderDelayMinutes).distinct().sorted()
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         options.forEach { minutes ->
                             FilterChip(
@@ -421,7 +422,7 @@ private fun ThresholdRow(thresholdHpa: Double, onStep: (Int) -> Unit) {
         Text(stringResource(R.string.settings_drop_threshold_label), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         OutlinedButton(
             onClick = { onStep(-1) },
-            enabled = thresholdHpa > MIN_DROP_THRESHOLD_HPA,
+            enabled = thresholdHpa > SettingsLimits.MIN_DROP_THRESHOLD_HPA,
             modifier = Modifier.size(56.dp).testTag(TAG_THRESHOLD_MINUS).semantics { contentDescription = minus },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         ) { Text("−", style = MaterialTheme.typography.headlineSmall) }
@@ -433,7 +434,7 @@ private fun ThresholdRow(thresholdHpa: Double, onStep: (Int) -> Unit) {
         )
         OutlinedButton(
             onClick = { onStep(+1) },
-            enabled = thresholdHpa < MAX_DROP_THRESHOLD_HPA,
+            enabled = thresholdHpa < SettingsLimits.MAX_DROP_THRESHOLD_HPA,
             modifier = Modifier.size(56.dp).testTag(TAG_THRESHOLD_PLUS).semantics { contentDescription = plus },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         ) { Text("+", style = MaterialTheme.typography.headlineSmall) }

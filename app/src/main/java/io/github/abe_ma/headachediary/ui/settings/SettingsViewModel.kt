@@ -7,6 +7,7 @@ import io.github.abe_ma.headachediary.domain.Prefecture
 import io.github.abe_ma.headachediary.domain.PrefectureRepository
 import io.github.abe_ma.headachediary.domain.PressureRepository
 import io.github.abe_ma.headachediary.domain.Settings
+import io.github.abe_ma.headachediary.domain.SettingsLimits
 import io.github.abe_ma.headachediary.domain.SettingsRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,11 +18,10 @@ import java.time.Instant
 import java.time.LocalTime
 import javax.inject.Inject
 
-/** 効果リマインドの遅延の選択肢 (分)。FR-500。 */
-val EFFECT_DELAY_OPTIONS_MINUTES = listOf(30, 60, 120, 180, 360)
-
-const val MIN_DROP_THRESHOLD_HPA = 1.0
-const val MAX_DROP_THRESHOLD_HPA = 20.0
+/**
+ * 設定値の範囲 (効果リマインドの遅延の選択肢、気圧低下のしきい値の最小/最大) は domain.SettingsLimits を参照する。
+ * バックアップ復元の正規化と同じ定義を共有するための一元化 (値は変わらない)。UI だけが使う刻みはここに置く。
+ */
 const val DROP_THRESHOLD_STEP_HPA = 1.0
 
 data class SettingsUiState(
@@ -68,7 +68,7 @@ class SettingsViewModel @Inject constructor(
     /** FR-501: しきい値は 1〜20 hPa の範囲に収める。 */
     fun changeDropThreshold(deltaSteps: Int) = update {
         val next = (it.dropThresholdHpa + deltaSteps * DROP_THRESHOLD_STEP_HPA)
-            .coerceIn(MIN_DROP_THRESHOLD_HPA, MAX_DROP_THRESHOLD_HPA)
+            .coerceIn(SettingsLimits.MIN_DROP_THRESHOLD_HPA, SettingsLimits.MAX_DROP_THRESHOLD_HPA)
         it.copy(dropThresholdHpa = next)
     }
 
