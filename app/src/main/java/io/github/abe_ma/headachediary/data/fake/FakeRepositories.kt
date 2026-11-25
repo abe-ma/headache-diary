@@ -163,4 +163,5 @@ class FakeRepositories(
     val settings: FakeSettingsRepository = FakeSettingsRepository(),
     val export: FakeExportRepository = FakeExportRepository(),
     val prefectures: PrefectureRepository = StaticPrefectureRepository(),
+    val backup: FakeBackupRepository = FakeBackupRepository(),
 )
