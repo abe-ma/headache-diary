@@ -28,6 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import io.github.abe_ma.headachediary.R
+import io.github.abe_ma.headachediary.ui.backup.BackupScreen
 import io.github.abe_ma.headachediary.ui.edit.AttackEditScreen
 import io.github.abe_ma.headachediary.ui.export.ExportScreen
 import io.github.abe_ma.headachediary.ui.edit.AttackEditViewModel
@@ -43,6 +44,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val MEDICATIONS = "settings/medications"
     const val ABOUT = "settings/about"
+    const val BACKUP = "settings/backup"
     const val EXPORT = "export"
     const val ATTACK = "attack/{${AttackEditViewModel.ARG_ID}}"
     fun attack(id: Long) = "attack/$id"
@@ -97,10 +99,12 @@ fun AppRoot() {
                 SettingsScreen(
                     onOpenMedications = { navController.navigate(Routes.MEDICATIONS) },
                     onOpenExport = { navController.navigate(Routes.EXPORT) },
+                    onOpenBackup = { navController.navigate(Routes.BACKUP) },
                     onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 )
             }
             composable(Routes.MEDICATIONS) { MedicationManageScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.BACKUP) { BackupScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.EXPORT) { ExportScreen(onBack = { navController.popBackStack() }) }
             composable(

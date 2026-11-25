@@ -77,6 +77,7 @@ const val TAG_THRESHOLD_VALUE = "settings_threshold_value"
 const val TAG_DROP_TIME = "settings_drop_time"
 const val TAG_MEDICATIONS_ROW = "settings_medications_row"
 const val TAG_EXPORT_ROW = "settings_export_row"
+const val TAG_BACKUP_ROW = "settings_backup_row"
 const val TAG_ABOUT_ROW = "settings_about_row"
 const val TAG_PERMISSION_DENIED = "settings_permission_denied"
 const val TAG_PERMISSION_MISSING = "settings_permission_missing"
@@ -99,6 +100,7 @@ data class SettingsActions(
     val onDropTimeChange: (LocalTime) -> Unit = {},
     val onOpenMedications: () -> Unit = {},
     val onOpenExport: () -> Unit = {},
+    val onOpenBackup: () -> Unit = {},
     val onOpenAbout: () -> Unit = {},
     val onOpenNotificationSettings: () -> Unit = {},
 )
@@ -107,6 +109,7 @@ data class SettingsActions(
 fun SettingsScreen(
     onOpenMedications: () -> Unit,
     onOpenExport: () -> Unit,
+    onOpenBackup: () -> Unit,
     onOpenAbout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -157,6 +160,7 @@ fun SettingsScreen(
         onDropTimeChange = viewModel::setDropNotifyTime,
         onOpenMedications = onOpenMedications,
         onOpenExport = onOpenExport,
+        onOpenBackup = onOpenBackup,
         onOpenAbout = onOpenAbout,
         onOpenNotificationSettings = {
             context.startActivity(
@@ -285,6 +289,12 @@ fun SettingsContent(
                 description = stringResource(R.string.settings_export_desc),
                 onClick = actions.onOpenExport,
                 tag = TAG_EXPORT_ROW,
+            )
+            NavRow(
+                title = stringResource(R.string.settings_backup),
+                description = stringResource(R.string.settings_backup_desc),
+                onClick = actions.onOpenBackup,
+                tag = TAG_BACKUP_ROW,
             )
             NavRow(
                 title = stringResource(R.string.settings_about),

@@ -192,6 +192,57 @@
     <string name="export_attribution">気圧データ: Weather data by Open-Meteo.com</string>
     <string name="export_date_format">%1$d年%2$d月%3$d日</string>
 
+    <!-- バックアップと復元 (FR-600〜607)。診断・助言を含まない (NFR-104) -->
+    <string name="settings_backup">バックアップと復元</string>
+    <string name="settings_backup_desc">機種変更や再インストールに備えて、記録をファイルに保存・読み込みします</string>
+    <string name="backup_title">バックアップと復元</string>
+    <string name="backup_section_create">バックアップを作成</string>
+    <string name="backup_create_desc">発作の記録・服薬・設定を1つのファイルに保存します。保存先は自分で選びます。</string>
+    <string name="backup_create_button">バックアップを作成</string>
+    <string name="backup_section_restore">バックアップを読み込む</string>
+    <string name="backup_restore_desc">作成したバックアップファイルを選んで、今ある記録に追加します。同じ記録は重複して追加されません。</string>
+    <string name="backup_restore_button">バックアップを読み込む</string>
+    <string name="backup_note_separate">CSV・PDF の書き出しとは別の機能です。CSV・PDF は閲覧や提出用で、読み込みには使えません。</string>
+    <string name="backup_note_no_upload">アプリが自動でファイルを外部に送ることはありません。</string>
+    <string name="backup_working_creating">バックアップを作成しています…</string>
+    <string name="backup_working_inspecting">ファイルを確認しています…</string>
+    <string name="backup_working_restoring">記録を読み込んでいます…</string>
+    <string name="backup_warning_title">バックアップを作成します</string>
+    <string name="backup_warning_body">バックアップファイルには、発作の記録や服薬など、健康に関するデータが含まれます。ファイルは暗号化されずに保存されます。保存先とファイルの扱いにご注意ください。</string>
+    <string name="backup_warning_accept">保存先を選ぶ</string>
+    <string name="backup_warning_cancel">やめる</string>
+    <string name="backup_created_title">バックアップを作成しました</string>
+    <string name="backup_created_body">選んだ保存先にファイルを保存しました。</string>
+    <string name="backup_confirm_title">このバックアップを読み込みますか?</string>
+    <string name="backup_confirm_exported">作成: %1$s (アプリのバージョン %2$s)</string>
+    <string name="backup_confirm_attacks">発作の記録: %1$d件</string>
+    <string name="backup_confirm_attacks_none">発作の記録: なし</string>
+    <string name="backup_confirm_period">期間: %1$s 〜 %2$s</string>
+    <string name="backup_confirm_new_duplicate">うち追加される記録: %1$d件、重複のため読み込まない記録: %2$d件</string>
+    <string name="backup_confirm_custom_meds">自由入力した薬: %1$d件</string>
+    <string name="backup_confirm_settings_included">設定: 含まれています。地域・通知の時間やしきい値などが、今の設定に上書きされます。通知のオン/オフは、読み込み後は必ずオフになります。</string>
+    <string name="backup_confirm_settings_none">設定: 含まれていません</string>
+    <string name="backup_confirm_accept">読み込む</string>
+    <string name="backup_confirm_cancel">やめる</string>
+    <string name="backup_result_title">読み込みが終わりました</string>
+    <string name="backup_result_added">追加した発作の記録: %1$d件</string>
+    <string name="backup_result_skipped">重複のため読み込まなかった記録: %1$d件</string>
+    <string name="backup_result_meds">追加した薬: %1$d件</string>
+    <string name="backup_result_settings_applied">設定: 読み込んだ設定を反映しました</string>
+    <string name="backup_result_settings_none">設定: 反映していません</string>
+    <string name="backup_result_notifications_off">通知はオフになっています。使う場合は、設定の画面で有効にしてください。</string>
+    <string name="backup_result_open_settings">設定に戻る</string>
+    <string name="backup_result_close">閉じる</string>
+    <string name="backup_error_title">読み込めませんでした</string>
+    <string name="backup_error_create_title">作成できませんでした</string>
+    <string name="backup_error_not_backup">このファイルは、このアプリのバックアップ形式ではありません。</string>
+    <string name="backup_error_corrupt">ファイルが壊れているか、途中で切れています。</string>
+    <string name="backup_error_too_large">ファイルが大きすぎるため読み込めません (上限 20MB)。</string>
+    <string name="backup_error_unsupported_version">新しいバージョンのアプリで作成されたファイルです。アプリを更新してください。</string>
+    <string name="backup_error_io">ファイルを開けない、または書き込めませんでした。保存先やファイルを変えてお試しください。</string>
+    <string name="backup_error_unchanged">記録や設定は変更されていません。</string>
+    <string name="backup_error_close">閉じる</string>
+
     <!-- 薬選択 (FR-203, 206) -->
     <string name="picker_title">薬を選ぶ</string>
     <string name="picker_search_hint">薬の名前を検索、または入力</string>

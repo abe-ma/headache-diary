@@ -7,6 +7,8 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.abe_ma.headachediary.ui.backup.BackupFileAccess
+import io.github.abe_ma.headachediary.ui.backup.ContentResolverBackupFileAccess
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,4 +38,5 @@ class SharedPrefsNotificationPromptStore @Inject constructor(
 @InstallIn(SingletonComponent::class)
 abstract class UiBindingsModule {
     @Binds abstract fun promptStore(impl: SharedPrefsNotificationPromptStore): NotificationPromptStore
+    @Binds abstract fun backupFiles(impl: ContentResolverBackupFileAccess): BackupFileAccess
 }
